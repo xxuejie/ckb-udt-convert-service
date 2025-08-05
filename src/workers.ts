@@ -11,13 +11,13 @@ import {
   udtArgs,
   minUdtCellCkb,
   initialUdtCellCkb,
-  Logger,
   ASSEMBLE_BATCH,
 } from "./env";
 import {
   epoch_timestamp,
   buildKey,
   buildUdtScript,
+  Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
   KEY_COMMITING_CELLS,
@@ -30,7 +30,7 @@ export const refresherWorker = new Worker(
   "refresher",
   // TODO: maybe we will need redlock to ensure exclusiveness, maybe not
   async (job) => {
-    const udtScript = await buildUdtScript(funder);
+    const udtScript = await buildUdtScript(funder, udtArgs);
     const current_timestamp = epoch_timestamp();
 
     // Here we have 2 kinds of cells:
@@ -134,7 +134,7 @@ export const refresherWorker = new Worker(
 export const assemblerWorker = new Worker(
   "assembler",
   async (job) => {
-    const udtScript = await buildUdtScript(funder);
+    const udtScript = await buildUdtScript(funder, udtArgs);
 
     // See refresher worker for details
     const queriedUdtCells = await Array.fromAsync(

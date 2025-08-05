@@ -7,12 +7,13 @@ import {
   funder,
   lockedSeconds,
   signerQueue,
-  Logger,
+  udtArgs,
 } from "./env";
 import {
   buildKey,
   buildUdtScript,
   epoch_timestamp,
+  Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
   KEY_COMMITING_CELLS,
@@ -58,7 +59,7 @@ async function initiate(params: any): Promise<Result> {
   // TODO: validate input parameters
   let tx = ccc.Transaction.from(params[0]);
 
-  const udtScript = await buildUdtScript(funder);
+  const udtScript = await buildUdtScript(funder, udtArgs);
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
     parseInt(currentTimestamp) + lockedSeconds

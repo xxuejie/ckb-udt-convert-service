@@ -1,7 +1,8 @@
 import { Worker } from "bullmq";
 import { ccc } from "@ckb-ccc/core";
 
-import { dbConnection, queueConnection, env, funder, Logger } from "./env";
+import { dbConnection, queueConnection, funder } from "./env";
+import { env, Logger } from "./utils";
 
 const signer = new ccc.SignerCkbPrivateKey(
   funder.client,

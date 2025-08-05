@@ -4,78 +4,19 @@
 import "dotenv/config";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
-import pino from "pino";
 import { ccc } from "@ckb-ccc/core";
-import { cccA } from "@ckb-ccc/core/advanced";
 
 import fs from "fs";
 import path from "path";
 
-export const Logger = pino();
-
-process.on("unhandledRejection", (reason, promise) => {
-  Logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
-});
-
-function assertIsDefined<T>(value: T | undefined | null, message?: string): T {
-  if (value === undefined || value === null) {
-    throw new Error(message || "Value cannot be undefined or null.");
-  }
-  return value;
-}
-
-export function env(value: string): string {
-  return assertIsDefined(
-    process.env[value],
-    `${value} is not set in .env file!`,
-  );
-}
-
-// We will use this till we figure out the details of ccc's cache
-class NoCache extends ccc.ClientCache {
-  async markUsableNoCache(
-    ...cellLikes: (ccc.CellLike | ccc.CellLike[])[]
-  ): Promise<void> {}
-
-  async markUnusable(
-    ...outPointLikes: (ccc.OutPointLike | ccc.OutPointLike[])[]
-  ): Promise<void> {}
-
-  async clear(): Promise<void> {}
-
-  async *findCells(
-    keyLike: cccA.ClientCollectableSearchKeyLike,
-  ): AsyncGenerator<ccc.Cell> {}
-
-  async isUnusable(outPointLike: ccc.OutPointLike): Promise<boolean> {
-    return false;
-  }
-}
+import { env, buildNoCacheClient, Logger } from "./utils";
 
 export function buildCccClient() {
-  const network = env("CKB_NETWORK");
-  switch (network) {
-    case "mainnet":
-      return new ccc.ClientPublicMainnet({
-        url: env("CKB_RPC_URL"),
-        cache: new NoCache(),
-      });
-    case "testnet":
-      return new ccc.ClientPublicTestnet({
-        url: env("CKB_RPC_URL"),
-        cache: new NoCache(),
-      });
-    case "devnet":
-      return new ccc.ClientPublicTestnet({
-        url: env("CKB_RPC_URL"),
-        scripts: JSON.parse(fs.readFileSync(env("SCRIPT_CONFIG_FILE"), "utf8")),
-        fallbacks: [],
-        cache: new NoCache(),
-      });
-    default:
-      throw new Error(`Unknown network value: ${network}`);
-  }
+  return buildNoCacheClient(
+    env("CKB_NETWORK"),
+    env("CKB_RPC_URL"),
+    env("SCRIPT_CONFIG_FILE"),
+  );
 }
 
 export const dbConnection = new IORedis(env("REDIS_DB_URL"), {
