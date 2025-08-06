@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config({ path: process.env["DOTENV_FILE"] || ".env" });
+
 import { ccc } from "@ckb-ccc/core";
 import { JSONRPCClient } from "json-rpc-2.0";
 
@@ -20,6 +23,9 @@ async function run() {
     ckbClient,
   );
 
+  let plainCells = 0;
+  let udtCells = 0;
+  let unknownCells = 0;
   for await (const cell of ckbClient.findCellsByLock(
     address.script,
     null,
@@ -32,7 +38,8 @@ async function run() {
         "CKBytes:",
         ccc.fixedPointToString(cell.cellOutput.capacity),
       );
-    } else if (cell.cellOutput.type === udtScript) {
+      plainCells += 1;
+    } else if (cell.cellOutput.type.eq(udtScript)) {
       const udtBalance = ccc.udtBalanceFrom(cell.outputData);
       console.log(
         "UDT Cell:",
@@ -42,6 +49,7 @@ async function run() {
         "UDT:",
         ccc.fixedPointToString(udtBalance, 6),
       );
+      udtCells += 1;
     } else {
       console.log(
         "Unknown cell:",
@@ -49,8 +57,13 @@ async function run() {
         "CKBytes:",
         ccc.fixedPointToString(cell.cellOutput.capacity),
       );
+      unknownCells += 1;
     }
   }
+
+  console.log(
+    `In total, ${plainCells} plain cells, ${udtCells} UDT cells, ${unknownCells} unknown cells`,
+  );
 }
 
 run();

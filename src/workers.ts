@@ -17,6 +17,7 @@ import {
   epoch_timestamp,
   buildKey,
   buildUdtScript,
+  fetchFeeRate,
   Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
@@ -131,6 +132,10 @@ export const refresherWorker = new Worker(
   { connection: queueConnection },
 );
 
+refresherWorker.on("failed", (job, error) => {
+  Logger.error(`Refresher job ${job?.id} failed:`, error);
+});
+
 export const assemblerWorker = new Worker(
   "assembler",
   async (job) => {
@@ -201,8 +206,11 @@ export const assemblerWorker = new Worker(
       }
 
       // Build a CKB transaction converting ckb cells to UDT cells
-      const outputCount = capacity / initialUdtCellCkb;
-      const spareCapacity = capacity - outputCount * initialUdtCellCkb;
+      let outputCount = Number(capacity / initialUdtCellCkb);
+      if (outputCount >= ASSEMBLE_BATCH) {
+        outputCount = ASSEMBLE_BATCH;
+      }
+      const spareCapacity = capacity - BigInt(outputCount) * initialUdtCellCkb;
       const lockScript = (await funder.getAddressObjSecp256k1()).script;
       const collectedUdtAmount = inputCells
         .map((cell) => {
@@ -217,18 +225,31 @@ export const assemblerWorker = new Worker(
         })
         .reduce((acc, val) => acc + val, 0n);
 
-      const outputs = [...Array(outputCount)].map((_, _i) => {
-        return {
+      const outputs = [];
+      const outputsData = [];
+      for (let i = 0; i < outputCount; i++) {
+        outputs.push({
           capacity: initialUdtCellCkb,
           lock: lockScript,
           type: udtScript,
-        };
-      });
-      const outputsData = [...Array(outputCount)].map((_, _i) => {
-        return ccc.numLeToBytes(0, 16);
-      });
-      outputs[0].capacity += spareCapacity;
+        });
+        outputsData.push(ccc.numLeToBytes(0, 16));
+      }
       outputsData[0] = ccc.numLeToBytes(collectedUdtAmount, 16);
+      const spareCellOutput = ccc.CellOutput.from({
+        capacity: spareCapacity,
+        lock: lockScript,
+      });
+      if (
+        spareCapacity >=
+        ccc.fixedPointFrom(spareCellOutput.occupiedSize) +
+          ccc.fixedPointFrom("1")
+      ) {
+        outputs.push(spareCellOutput);
+        outputsData.push("0x");
+      } else {
+        outputs[outputs.length - 1].capacity += spareCapacity;
+      }
 
       const tx = await funder.prepareTransaction({
         inputs: inputCells,
@@ -236,9 +257,18 @@ export const assemblerWorker = new Worker(
         outputsData,
       });
       await tx.addCellDepsOfKnownScripts(funder.client, ccc.KnownScript.XUdt);
+      await tx.completeFeeChangeToOutput(
+        funder,
+        outputs.length - 1,
+        await fetchFeeRate(funder.client),
+      );
 
-      await signerQueue.add("sign_send", { tx: tx.toBytes() });
+      await signerQueue.add("sign_send", { tx: ccc.hexFrom(tx.toBytes()) });
     }
   },
   { connection: queueConnection },
 );
+
+assemblerWorker.on("failed", (job, error) => {
+  Logger.error(`Assembler job ${job?.id} failed:`, error);
+});

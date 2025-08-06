@@ -3,8 +3,25 @@ import { ccc } from "@ckb-ccc/core";
 import { cccA } from "@ckb-ccc/core/advanced";
 
 import fs from "fs";
+import util from "util";
 
-export const Logger = pino();
+const pinoLogger = pino();
+
+export const Logger = {
+  pino: pinoLogger,
+  debug: (...args: any[]) => {
+    pinoLogger.debug(util.format(...args));
+  },
+  info: (...args: any[]) => {
+    pinoLogger.info(util.format(...args));
+  },
+  error: (...args: any[]) => {
+    pinoLogger.error(util.format(...args));
+  },
+  warn: (...args: any[]) => {
+    pinoLogger.warn(util.format(...args));
+  },
+};
 
 process.on("unhandledRejection", (reason, promise) => {
   Logger.error("Unhandled Rejection at:", promise, "reason:", reason);
@@ -87,11 +104,24 @@ export const KEY_PREFIX_CELL = "CELL:";
 export const KEY_PREFIX_TX = "TX:";
 export const KEY_PREFIX_SIGNED_TX = "SIGNED_TX:";
 
-export function buildKey(prefix: ccc.BytesLike, content: ccc.BytesLike) {
-  return Buffer.from(ccc.bytesConcat(prefix, content));
+export function buildKey(prefix: string, content: ccc.BytesLike) {
+  return prefix + ccc.hexFrom(content);
 }
 
 export async function buildUdtScript(client: ccc.Client, args: ccc.Hex) {
   const udtScriptInfo = await client.getKnownScript(ccc.KnownScript.XUdt);
   return new ccc.Script(udtScriptInfo.codeHash, udtScriptInfo.hashType, args);
+}
+
+export async function fetchFeeRate(client: ccc.Client) {
+  try {
+    return (await client.getFeeRateStatistics())?.median;
+  } catch (e) {
+    const rate = process.env["DEFAULT_FEE_RATE"];
+    if (rate === null || rate === undefined) {
+      return cccA.DEFAULT_MIN_FEE_RATE;
+    } else {
+      return parseInt(rate);
+    }
+  }
 }

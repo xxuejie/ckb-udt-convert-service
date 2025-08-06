@@ -24,7 +24,7 @@ end
 purge_locked()
 local expired_committing_cells = purge_expired(committing_cells_key)
 
-redis.call("ZDIFFSTORE", ckb_cells_key, ckb_cells_key, locked_cells_key, committing_cells_key)
+redis.call("ZDIFFSTORE", ckb_cells_key, 3, ckb_cells_key, locked_cells_key, committing_cells_key)
 redis.call("DEL", live_cells_key)
 for _, v in ipairs(redis.call("ZRANGE", ckb_cells_key, 0, -1)) do
   redis.call("SADD", live_cells_key, v)

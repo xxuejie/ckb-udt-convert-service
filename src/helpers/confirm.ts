@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config({ path: process.env["DOTENV_FILE"] || ".env" });
+
 import { ccc } from "@ckb-ccc/core";
 import { JSONRPCClient } from "json-rpc-2.0";
 

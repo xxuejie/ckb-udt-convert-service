@@ -1,7 +1,6 @@
-// TODO: split this later, signer specific code should be in its own
-// module
+import dotenv from "dotenv";
+dotenv.config({ path: process.env["DOTENV_FILE"] || ".env" });
 
-import "dotenv/config";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import { ccc } from "@ckb-ccc/core";

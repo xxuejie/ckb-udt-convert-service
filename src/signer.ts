@@ -13,7 +13,7 @@ export const signerWorker = new Worker(
   "signer",
   async (job) => {
     // For now we let BullMQ handles decoding failure
-    const tx = ccc.Transaction.fromBytes(job.data.tx);
+    const tx = ccc.Transaction.fromBytes(ccc.bytesFrom(job.data.tx));
     const signedTx = await signer.signTransaction(tx);
 
     switch (job.name) {
@@ -22,7 +22,8 @@ export const signerWorker = new Worker(
           await signer.client.sendTransaction(signedTx);
         } catch (e) {
           Logger.error(
-            `Sending transaction ${signedTx.hash()} receives errors: ${e}`,
+            `Sending transaction ${signedTx.hash()} receives errors:`,
+            e,
           );
         }
         break;
@@ -40,3 +41,7 @@ export const signerWorker = new Worker(
     connection: queueConnection,
   },
 );
+
+signerWorker.on("failed", (job, error) => {
+  Logger.error(`Signer job ${job?.id} failed:`, error);
+});
