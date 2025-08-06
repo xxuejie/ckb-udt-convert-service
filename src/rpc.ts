@@ -59,7 +59,7 @@ async function initiate(params: any): Promise<Result> {
   // TODO: validate input parameters
   let tx = ccc.Transaction.from(params[0]);
 
-  const udtScript = await buildUdtScript(funder, udtArgs);
+  const udtScript = await buildUdtScript(funder.client, udtArgs);
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
     parseInt(currentTimestamp) + lockedSeconds

@@ -91,9 +91,7 @@ export function buildKey(prefix: ccc.BytesLike, content: ccc.BytesLike) {
   return Buffer.from(ccc.bytesConcat(prefix, content));
 }
 
-export async function buildUdtScript(funder: ccc.Signer, args: ccc.Hex) {
-  const udtScriptInfo = await funder.client.getKnownScript(
-    ccc.KnownScript.XUdt,
-  );
+export async function buildUdtScript(client: ccc.Client, args: ccc.Hex) {
+  const udtScriptInfo = await client.getKnownScript(ccc.KnownScript.XUdt);
   return new ccc.Script(udtScriptInfo.codeHash, udtScriptInfo.hashType, args);
 }

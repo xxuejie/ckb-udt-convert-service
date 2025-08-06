@@ -51,6 +51,9 @@ export const queueConnection = new IORedis(env("REDIS_MQ_URL"), {
 export const refresherQueue = new Queue("refresher", {
   connection: queueConnection,
 });
+export const assemblerQueue = new Queue("assembler", {
+  connection: queueConnection,
+});
 export const signerQueue = new Queue("signer", { connection: queueConnection });
 
 const ckbClient = buildCccClient();

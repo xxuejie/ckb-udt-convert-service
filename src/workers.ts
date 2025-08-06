@@ -30,7 +30,7 @@ export const refresherWorker = new Worker(
   "refresher",
   // TODO: maybe we will need redlock to ensure exclusiveness, maybe not
   async (job) => {
-    const udtScript = await buildUdtScript(funder, udtArgs);
+    const udtScript = await buildUdtScript(funder.client, udtArgs);
     const current_timestamp = epoch_timestamp();
 
     // Here we have 2 kinds of cells:
@@ -134,7 +134,7 @@ export const refresherWorker = new Worker(
 export const assemblerWorker = new Worker(
   "assembler",
   async (job) => {
-    const udtScript = await buildUdtScript(funder, udtArgs);
+    const udtScript = await buildUdtScript(funder.client, udtArgs);
 
     // See refresher worker for details
     const queriedUdtCells = await Array.fromAsync(

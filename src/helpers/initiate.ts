@@ -38,7 +38,7 @@ async function run() {
   );
 
   const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
-  const udtScript = await buildUdtScript(signer, udtArgs);
+  const udtScript = await buildUdtScript(signer.client, udtArgs);
 
   const recipient = await ccc.Address.fromString(
     env("HELPER_RECIPIENT_ADDRESS"),

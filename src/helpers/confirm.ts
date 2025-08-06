@@ -3,7 +3,7 @@ import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
-import { env, buildNoCacheClient, buildUdtScript } from "../utils";
+import { env, buildNoCacheClient } from "../utils";
 
 const rpcClient = new JSONRPCClient(
   (jsonRPCRequest: any): Promise<any> =>
