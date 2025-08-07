@@ -30,7 +30,7 @@ export const signerWorker = new Worker(
       case "sign":
         await dbConnection.set(
           job.data.targetKey,
-          Buffer.from(signedTx.toBytes()),
+          ccc.hexFrom(signedTx.toBytes()),
         );
         break;
       default:

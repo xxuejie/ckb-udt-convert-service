@@ -29,7 +29,7 @@ export const dbConnection = new IORedis(env("REDIS_DB_URL"), {
       ),
     },
     commitCell: {
-      numberOfKeys: 2,
+      numberOfKeys: 4,
       lua: fs.readFileSync(
         path.resolve(__dirname, "..", "lua", "commit_cell.lua"),
         "utf8",

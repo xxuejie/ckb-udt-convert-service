@@ -15,7 +15,7 @@ const rpcClient = new JSONRPCClient(
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(jsonRPCRequest),
+      body: ccc.stringify(jsonRPCRequest),
     }).then((response) => {
       if (response.status === 200) {
         // Use client.receive when you received a JSON-RPC response.

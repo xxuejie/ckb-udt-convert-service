@@ -65,8 +65,8 @@ export const refresherWorker = new Worker(
       const key = buildKey(KEY_PREFIX_CELL, cell.outPoint.toBytes());
       if ((await dbConnection.exists([key])) !== 1) {
         await dbConnection.hset(key, {
-          cell_output: cell.cellOutput.toBytes(),
-          output_data: ccc.bytesFrom(cell.outputData),
+          cell_output: ccc.hexFrom(cell.cellOutput.toBytes()),
+          output_data: ccc.hexFrom(cell.outputData),
         });
       }
       bufferedArgs.push(1);
@@ -104,7 +104,7 @@ export const refresherWorker = new Worker(
         const txData = await dbConnection.get(txKey);
         parsed = ccc.Transaction.fromBytes(txData!);
       } catch (e) {
-        Logger.error(`Error parsing tx: ${e}`);
+        Logger.error("Error parsing commiting tx:", e);
         await clearTx();
         continue;
       }

@@ -9,8 +9,8 @@ local current_timestamp = ARGV[1]
 
 local function purge_expired(key)
   local expired_cells = redis.call("ZRANGE", key,
-                                   current_timestamp, "+inf", "BYSCORE")
-  redis.call("ZREMRANGEBYSCORE", key, current_timestamp, "+inf")
+                                   "-inf", current_timestamp, "BYSCORE")
+  redis.call("ZREMRANGEBYSCORE", key, "-inf", current_timestamp)
   return expired_cells
 end
 

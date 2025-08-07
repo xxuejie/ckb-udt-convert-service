@@ -84,7 +84,6 @@ async function run() {
     ccc.numLeToBytes(inputsAmount - sendAmount, 16),
   );
   await tx.prepareSighashAllWitness(signerLock, 65, signer.client);
-  console.log("Original tx:", tx);
 
   const {
     valid_until,
@@ -93,16 +92,8 @@ async function run() {
     bid_tokens,
   } = await rpcClient.request("initiate", [tx, [1]]);
   console.log("Request valid until:", valid_until);
-  console.log(
-    "Ask USDI:",
-    ccc.numFrom(ask_tokens),
-    ccc.fixedPointToString(ccc.numFrom(ask_tokens), 6),
-  );
-  console.log(
-    "Bid CKBytes:",
-    ccc.numFrom(bid_tokens),
-    ccc.fixedPointToString(ccc.numFrom(bid_tokens)),
-  );
+  console.log("Ask USDI:", ccc.fixedPointToString(ccc.numFrom(ask_tokens), 6));
+  console.log("Bid CKBytes:", ccc.fixedPointToString(ccc.numFrom(bid_tokens)));
   console.log("Completed tx:", completedTx);
 
   const completedTxStr = JSON.stringify(completedTx, null, "  ");

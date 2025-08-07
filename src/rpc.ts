@@ -192,7 +192,7 @@ async function initiate(params: any): Promise<Result> {
   await dbConnection.setex(
     buildKey(KEY_PREFIX_TX, outPointBytes),
     lockedSeconds * 2,
-    Buffer.from(tx.toBytes()),
+    ccc.hexFrom(tx.toBytes()),
   );
 
   return {
@@ -222,8 +222,9 @@ async function confirm(params: any): Promise<Result> {
     parseInt(currentTimestamp) + lockedSeconds
   ).toString();
 
-  const lockedCellBytes =
-    tx.inputs[tx.inputs.length - 1].previousOutput.toBytes();
+  const lockedCellBytes = ccc.hexFrom(
+    tx.inputs[tx.inputs.length - 1].previousOutput.toBytes(),
+  );
   const txKey = buildKey(KEY_PREFIX_TX, lockedCellBytes);
   const savedTxBytes = await dbConnection.get(txKey);
 
@@ -251,7 +252,7 @@ async function confirm(params: any): Promise<Result> {
     KEY_LOCKED_CELLS,
     KEY_COMMITING_CELLS,
     txKey,
-    Buffer.from(lockedCellBytes),
+    lockedCellBytes,
     currentTimestamp,
     expiredTimestamp,
   );
@@ -276,7 +277,8 @@ async function confirm(params: any): Promise<Result> {
     (await dbConnection.get(signedTxKey))!,
   );
   try {
-    await funder.client.sendTransaction(signedTx);
+    const txHash = await funder.client.sendTransaction(signedTx);
+    Logger.info(`Tx ${txHash} submitted to CKB!`);
   } catch (e) {
     // We will rely on background worker to cleanup database for
     // failed transactions.

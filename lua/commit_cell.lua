@@ -9,16 +9,17 @@ local cell = ARGV[1]
 local current_timestamp = ARGV[2]
 local expired_timestamp = ARGV[3]
 
-local locked_expired_timestamp = redis.call("ZSCORE", locked_cells_key, cell)
+local locked_expired_timestamp = tonumber(redis.call("ZSCORE", locked_cells_key, cell))
 if locked_expired_timestamp == nil then 
   return false
 end
 
 redis.call("ZREM", locked_cells_key, cell)
-if current_timestamp > locked_expired_timestamp then
+if tonumber(current_timestamp) > locked_expired_timestamp then
   redis.call("SADD", live_cells_key, cell)
   redis.call("DEL", tx_key)
   return false
 end
 
-redis.call("ZADD", committing_cells_key, cell, expired_timestamp)
+redis.call("ZADD", committing_cells_key, expired_timestamp, cell)
+return true
