@@ -15,7 +15,7 @@ const rpcClient = new JSONRPCClient(
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify(jsonRPCRequest),
+      body: ccc.stringify(jsonRPCRequest),
     }).then((response) => {
       if (response.status === 200) {
         // Use client.receive when you received a JSON-RPC response.
@@ -56,7 +56,21 @@ async function run() {
     outputs: [{ lock: recipient.script, type: udtScript }],
     outputsData: [ccc.numLeToBytes(sendAmount, 16)],
   });
-  await tx.completeInputsByUdt(signer, udtScript, spareAmount);
+  // This is actually completeInputsByUdt, except that we don't always try
+  // to collect 2 inputs
+  await tx.completeInputs(
+    signer,
+    {
+      script: udtScript,
+      outputDataLenRange: [16, ccc.numFrom("0xffffffff")],
+    },
+    (acc, { outputData }, _i, _collected) => {
+      const balance = ccc.udtBalanceFrom(outputData);
+      const sum = acc + balance;
+      return sum >= sendAmount + spareAmount ? undefined : sum;
+    },
+    0n,
+  );
   const inputsCapacity = await tx.getInputsCapacity(signer.client);
   const inputsAmount = await tx.getInputsUdtBalance(signer.client, udtScript);
 
@@ -70,16 +84,25 @@ async function run() {
     ccc.numLeToBytes(inputsAmount - sendAmount, 16),
   );
   await tx.prepareSighashAllWitness(signerLock, 65, signer.client);
+  console.log("Original tx:", tx);
 
   const {
     valid_until,
     transaction: completedTx,
     ask_tokens,
     bid_tokens,
-  } = await rpcClient.request("initiate", [tx]);
+  } = await rpcClient.request("initiate", [tx, [1]]);
   console.log("Request valid until:", valid_until);
-  console.log("Ask USDI:", ccc.fixedPointFrom(ask_tokens, 6));
-  console.log("Bid CKBytes:", ccc.fixedPointFrom(bid_tokens));
+  console.log(
+    "Ask USDI:",
+    ccc.numFrom(ask_tokens),
+    ccc.fixedPointToString(ccc.numFrom(ask_tokens), 6),
+  );
+  console.log(
+    "Bid CKBytes:",
+    ccc.numFrom(bid_tokens),
+    ccc.fixedPointToString(ccc.numFrom(bid_tokens)),
+  );
   console.log("Completed tx:", completedTx);
 
   const completedTxStr = JSON.stringify(completedTx, null, "  ");

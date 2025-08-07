@@ -13,6 +13,7 @@ import {
   buildKey,
   buildUdtScript,
   epoch_timestamp,
+  fetchFeeRate,
   Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
@@ -77,8 +78,8 @@ async function initiate(params: any): Promise<Result> {
   }
   const bidTokensNoFee = outputCapacity - inputCapacity;
 
-  // TODO: figure out actual price from binance, for now we simply assume 1 CKB == 1 USDI
-  const price = 100n;
+  // TODO: figure out actual price from binance, for now we simply assume 1 CKB == 0.01 USDI
+  const price = 10000n;
 
   const indices = params[1];
   const availableUdtBalance = tx.outputs.reduce((acc, output, i) => {
@@ -106,7 +107,7 @@ async function initiate(params: any): Promise<Result> {
   }
 
   // Lock a live cell for current tx
-  const outPointBytes = (dbConnection as any).lockCell(
+  const outPointBytes = await (dbConnection as any).lockCell(
     KEY_LIVE_CELLS,
     KEY_LOCKED_CELLS,
     KEY_COMMITING_CELLS,
@@ -144,7 +145,7 @@ async function initiate(params: any): Promise<Result> {
   await tx.addCellDepsOfKnownScripts(funder.client, ccc.KnownScript.XUdt);
 
   // Calculate the fee to build final ask / bid tokens
-  const feeRate = await funder.client.getFeeRate();
+  const feeRate = await fetchFeeRate(funder.client);
   const fee = tx.estimateFee(feeRate);
 
   const bidTokens = bidTokensNoFee + fee;
@@ -198,8 +199,8 @@ async function initiate(params: any): Promise<Result> {
     result: {
       valid_until: new Date(parseInt(expiredTimestamp) * 1000).toISOString(),
       transaction: tx,
-      ask_tokens: askTokens.toString(),
-      bid_tokens: bidTokens.toString(),
+      ask_tokens: askTokens,
+      bid_tokens: bidTokens,
     },
   };
 }
@@ -261,7 +262,7 @@ async function confirm(params: any): Promise<Result> {
 
   const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, lockedCellBytes);
   await signerQueue.add("sign", {
-    tx: tx.toBytes(),
+    tx: ccc.hexFrom(tx.toBytes()),
     targetKey: signedTxKey,
   });
 

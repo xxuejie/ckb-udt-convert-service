@@ -1,4 +1,5 @@
 import express from "express";
+import { ccc } from "@ckb-ccc/core";
 
 import { funder, refresherQueue, assemblerQueue } from "./env";
 import { env } from "./utils";
@@ -22,6 +23,12 @@ async function init() {
 
   const app = express();
   app.use(express.json());
+  app.set("json replacer", (_: any, value: any) => {
+    if (typeof value === "bigint") {
+      return ccc.numToHex(value);
+    }
+    return value;
+  });
 
   app.post("/rpc", (req, res) => {
     rpc.receive(req.body).then((resp) => {

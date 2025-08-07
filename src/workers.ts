@@ -70,7 +70,7 @@ export const refresherWorker = new Worker(
         });
       }
       bufferedArgs.push(1);
-      bufferedArgs.push(Buffer.from(cell.outPoint.toBytes()));
+      bufferedArgs.push(ccc.hexFrom(cell.outPoint.toBytes()));
       if (bufferedArgs.length >= 100) {
         await dbConnection.zadd(ckbCellKey, ...bufferedArgs);
       }
