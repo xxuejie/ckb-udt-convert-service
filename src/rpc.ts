@@ -131,7 +131,7 @@ async function initiate(params: any): Promise<Result> {
     currentTimestamp,
     expiredTimestamp,
   );
-  if (outPointBytes === null || outPointBytes === undefined) {
+  if (!outPointBytes) {
     return {
       error: {
         code: ERROR_CODE_SERVER,

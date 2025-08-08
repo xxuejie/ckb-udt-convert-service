@@ -9,8 +9,9 @@ local expired_timestamp = ARGV[2]
 
 local function pop()
   local cell = redis.call("SPOP", live_cells_key)
-  if cell ~= nil then
+  if not cell then
     redis.call("ZADD", locked_cells_key, expired_timestamp, cell)
+    return false
   end
   return cell
 end
