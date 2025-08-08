@@ -26,6 +26,8 @@ async function init() {
         });
       }
       break;
+    case "custom":
+      break;
     default:
       {
         const fixedPrice = ccc.fixedPointFrom(strategy, 6);
