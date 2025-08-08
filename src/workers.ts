@@ -198,7 +198,8 @@ export const assemblerWorker = new Worker(
       ccc.fixedPointFrom("16");
     collectingCellOutput.capacity = collectingCellCapacity;
     // The extra 1 CKB is set aside for fees
-    const extraCapacity = collectingCellCapacity + ccc.fixedPointFrom("1");
+    const MAXIMUM_FEE = ccc.fixedPointFrom("1");
+    const extraCapacity = collectingCellCapacity + MAXIMUM_FEE;
 
     while (liveCkbCells.length > 0) {
       const inputCells = [];
@@ -262,8 +263,7 @@ export const assemblerWorker = new Worker(
       });
       if (
         spareCapacity >=
-        ccc.fixedPointFrom(spareCellOutput.occupiedSize) +
-          ccc.fixedPointFrom("1")
+        ccc.fixedPointFrom(spareCellOutput.occupiedSize) + MAXIMUM_FEE
       ) {
         outputs.push(spareCellOutput);
         outputsData.push("0x");

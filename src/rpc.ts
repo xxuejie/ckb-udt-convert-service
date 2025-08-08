@@ -107,10 +107,11 @@ async function initiate(params: any): Promise<Result> {
   // The estimation here is that the user should always be available to
   // trade one more CKBytes, so as to cover for fees. The actual charged
   // fees will be calculated below and are typically much less than 1 CKB.
+  const MAXIMUM_FEE = ccc.fixedPointFrom("1");
   const estimateAskTokens = calculateBidUdts(
     udtPricePerCkb,
     incentivePercent,
-    bidTokensNoFee + ccc.fixedPointFrom("1"),
+    bidTokensNoFee + MAXIMUM_FEE,
   );
   if (availableUdtBalance <= estimateAskTokens) {
     return {
