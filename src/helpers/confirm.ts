@@ -46,7 +46,7 @@ async function run() {
   const signedTx = await signer.signTransaction(tx);
 
   const response = await rpcClient.request("confirm", [signedTx]);
-  const completeTx = ccc.Transaction.from(response.tx);
+  const completeTx = ccc.Transaction.from(response.transaction);
 
   console.log("Final tx hash:", completeTx.hash());
 }

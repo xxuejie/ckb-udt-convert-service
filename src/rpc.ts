@@ -316,7 +316,7 @@ async function confirm(params: any): Promise<Result> {
 
   return {
     result: {
-      tx: signedTx,
+      transaction: signedTx,
     },
   };
 }
