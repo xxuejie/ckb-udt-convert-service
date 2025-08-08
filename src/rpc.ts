@@ -5,13 +5,16 @@ import { ccc } from "@ckb-ccc/core";
 import {
   dbConnection,
   funder,
+  incentivePercent,
   lockedSeconds,
   signerQueue,
   udtCellDeps,
+  udtName,
   udtScript,
 } from "./env";
 import {
   buildKey,
+  calculateBidUdts,
   epoch_timestamp,
   fetchFeeRate,
   Logger,
@@ -78,7 +81,16 @@ async function initiate(params: any): Promise<Result> {
   const bidTokensNoFee = outputCapacity - inputCapacity;
 
   // TODO: figure out actual price from binance, for now we simply assume 1 CKB == 0.01 USDI
-  const price = 10000n;
+  const priceStr = await dbConnection.get(`PRICE:${udtName}`);
+  if (priceStr === null || priceStr === undefined) {
+    return {
+      error: {
+        code: ERROR_CODE_SERVER,
+        message: `${udtName} price unknown!`,
+      },
+    };
+  }
+  const udtPricePerCkb = ccc.fixedPointFrom(priceStr, 6);
 
   const indices = params[1];
   const availableUdtBalance = tx.outputs.reduce((acc, output, i) => {
@@ -95,7 +107,11 @@ async function initiate(params: any): Promise<Result> {
   // The estimation here is that the user should always be available to
   // trade one more CKBytes, so as to cover for fees. The actual charged
   // fees will be calculated below and are typically much less than 1 CKB.
-  const estimateAskTokens = (bidTokensNoFee + ccc.fixedPointFrom("1")) / price;
+  const estimateAskTokens = calculateBidUdts(
+    udtPricePerCkb,
+    incentivePercent,
+    bidTokensNoFee + ccc.fixedPointFrom("1"),
+  );
   if (availableUdtBalance <= estimateAskTokens) {
     return {
       error: {
@@ -149,7 +165,11 @@ async function initiate(params: any): Promise<Result> {
   const fee = tx.estimateFee(feeRate);
 
   const bidTokens = bidTokensNoFee + fee;
-  const askTokens = bidTokens / price;
+  const askTokens = calculateBidUdts(
+    udtPricePerCkb,
+    incentivePercent,
+    bidTokens,
+  );
 
   // Modify the last output(our cell) to charge +bidTokens+ CKBytes,
   // and collect +askTokens+ UDTs

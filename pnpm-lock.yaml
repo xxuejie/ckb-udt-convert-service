@@ -11,6 +11,9 @@ importers:
       '@ckb-ccc/core':
         specifier: ^1.9.0
         version: 1.9.0(typescript@5.8.3)
+      '@hastom/fixed-point':
+        specifier: ^4.3.1
+        version: 4.3.1
       '@sesamecare-oss/redlock':
         specifier: ^1.4.0
         version: 1.4.0(ioredis@5.6.1)
@@ -56,6 +59,9 @@ packages:
 
   '@ckb-ccc/core@1.9.0':
     resolution: {integrity: sha512-znKLUJ9rTThtkyUKykZXfNM+Pj1GqCrlhYwl3LZ2EZSPQnQLTD6OquWoEaXLQppgGQ3+GYGjl6ZZDJhu796mHA==}
+
+  '@hastom/fixed-point@4.3.1':
+    resolution: {integrity: sha512-spzWEk2UmxzmrwROHJxeGkgIef6b4ChMDsLwtykWxuCvtA7JTF7O2LXn1YmmjcSy8MWr7ZoEnVafHwp9kwVM0w==}
 
   '@ioredis/commands@1.2.0':
     resolution: {integrity: sha512-Sx1pU8EM64o2BrqNpEO1CNLtKQwyhuXuqyfH7oGKCk+1a33d2r5saW8zNwm3j6BTExtjrv2BxTgzzkMwts6vGg==}
@@ -864,6 +870,8 @@ snapshots:
       - typescript
       - utf-8-validate
       - zod
+
+  '@hastom/fixed-point@4.3.1': {}
 
   '@ioredis/commands@1.2.0': {}
 

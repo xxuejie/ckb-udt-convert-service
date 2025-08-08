@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@ckb-ccc/core": "^1.9.0",
+    "@hastom/fixed-point": "^4.3.1",
     "@sesamecare-oss/redlock": "^1.4.0",
     "bullmq": "^5.56.8",
     "dotenv": "^17.2.1",

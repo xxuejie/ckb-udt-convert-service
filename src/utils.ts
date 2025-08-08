@@ -120,3 +120,31 @@ export async function fetchFeeRate(client: ccc.Client) {
     }
   }
 }
+
+import { fpFromDecimal } from "@hastom/fixed-point";
+
+// As of right now, ccc's FixedPoint uses a single bigint to represent
+// both the base and precision part. While adding / substracting works,
+// multiplication will not work in this case. We will have to rely on
+// another library for the task.
+export function calculateBidUdts(
+  udtPricePerCkb: ccc.FixedPoint,
+  incentivePercent: string,
+  ckbytes: ccc.FixedPoint,
+) {
+  const incentive = fpFromDecimal(incentivePercent, 6).add(
+    fpFromDecimal("1", 6),
+  );
+  const updatedPrice = fpFromDecimal(
+    ccc.fixedPointToString(udtPricePerCkb, 6),
+    6,
+  ).mul(incentive);
+
+  const normalizedCkbytes = fpFromDecimal(
+    ccc.fixedPointToString(ckbytes, 8),
+    8,
+  );
+  const bidUdts = normalizedCkbytes.mul(updatedPrice);
+
+  return ccc.fixedPointFrom(bidUdts.toDecimalString(), 6);
+}

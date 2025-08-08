@@ -1,13 +1,23 @@
 import express from "express";
 import { ccc } from "@ckb-ccc/core";
 
-import { funder, refresherQueue, assemblerQueue } from "./env";
+import {
+  dbConnection,
+  udtName,
+  funder,
+  refresherQueue,
+  assemblerQueue,
+} from "./env";
 import { env } from "./utils";
 import "./workers";
 import "./signer";
 import { rpc } from "./rpc";
 
 async function init() {
+  // TODO: right now the price is hardcoded to 1 CKB == 0.01 USDI,
+  // we should allow customizations.
+  await dbConnection.set(`PRICE:${udtName}`, "0.01");
+
   const refresherJob = await refresherQueue.upsertJobScheduler(
     "periodic-refresher",
     {
