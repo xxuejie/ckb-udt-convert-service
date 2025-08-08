@@ -16,6 +16,7 @@ import {
 } from "./env";
 import {
   epoch_timestamp,
+  env,
   buildKey,
   fetchFeeRate,
   Logger,
@@ -182,6 +183,23 @@ export const assemblerWorker = new Worker(
         return 0;
       }
     });
+
+    const collectingAddress = await ccc.Address.fromString(
+      env("COLLECTING_POOL_ADDRESS"),
+      funder.client,
+    );
+    const collectingCellOutput = ccc.CellOutput.from({
+      capacity: 0n,
+      lock: collectingAddress.script,
+      type: udtScript,
+    });
+    const collectingCellCapacity =
+      ccc.fixedPointFrom(collectingCellOutput.occupiedSize) +
+      ccc.fixedPointFrom("16");
+    collectingCellOutput.capacity = collectingCellCapacity;
+    // The extra 1 CKB is set aside for fees
+    const extraCapacity = collectingCellCapacity + ccc.fixedPointFrom("1");
+
     while (liveCkbCells.length > 0) {
       const inputCells = [];
       let capacity = 0n;
@@ -189,26 +207,17 @@ export const assemblerWorker = new Worker(
       while (
         liveCkbCells.length > 0 &&
         inputCells.length < ASSEMBLE_BATCH &&
-        capacity <
-          BigInt(ASSEMBLE_BATCH) * initialUdtCellCkb + ccc.fixedPointFrom("1")
+        capacity < BigInt(ASSEMBLE_BATCH) * initialUdtCellCkb + extraCapacity
       ) {
         const cell = liveCkbCells.pop()!;
         inputCells.push(cell);
         capacity += cell.cellOutput.capacity;
       }
 
-      // The extra 1 CKB is set aside for building fees
-      if (capacity < initialUdtCellCkb + ccc.fixedPointFrom("1")) {
+      if (capacity < initialUdtCellCkb + extraCapacity) {
         continue;
       }
 
-      // Build a CKB transaction converting ckb cells to UDT cells
-      let outputCount = Number(capacity / initialUdtCellCkb);
-      if (outputCount >= ASSEMBLE_BATCH) {
-        outputCount = ASSEMBLE_BATCH;
-      }
-      const spareCapacity = capacity - BigInt(outputCount) * initialUdtCellCkb;
-      const lockScript = (await funder.getAddressObjSecp256k1()).script;
       const collectedUdtAmount = inputCells
         .map((cell) => {
           if (
@@ -222,6 +231,17 @@ export const assemblerWorker = new Worker(
         })
         .reduce((acc, val) => acc + val, 0n);
 
+      // Build a CKB transaction converting ckb cells to UDT cells
+      let outputCount = Number(capacity / initialUdtCellCkb);
+      if (outputCount >= ASSEMBLE_BATCH) {
+        outputCount = ASSEMBLE_BATCH;
+      }
+      let spareCapacity = capacity - BigInt(outputCount) * initialUdtCellCkb;
+      if (collectedUdtAmount > 0) {
+        spareCapacity -= collectingCellCapacity;
+      }
+      const lockScript = (await funder.getAddressObjSecp256k1()).script;
+
       const outputs = [];
       const outputsData = [];
       for (let i = 0; i < outputCount; i++) {
@@ -232,7 +252,10 @@ export const assemblerWorker = new Worker(
         });
         outputsData.push(ccc.numLeToBytes(0, 16));
       }
-      outputsData[0] = ccc.numLeToBytes(collectedUdtAmount, 16);
+      if (collectedUdtAmount > 0) {
+        outputs.push(collectingCellOutput);
+        outputsData.push(ccc.numLeToBytes(collectedUdtAmount, 16));
+      }
       const spareCellOutput = ccc.CellOutput.from({
         capacity: spareCapacity,
         lock: lockScript,
@@ -245,7 +268,7 @@ export const assemblerWorker = new Worker(
         outputs.push(spareCellOutput);
         outputsData.push("0x");
       } else {
-        outputs[outputs.length - 1].capacity += spareCapacity;
+        outputs[0].capacity += spareCapacity;
       }
 
       const tx = await funder.prepareTransaction({
