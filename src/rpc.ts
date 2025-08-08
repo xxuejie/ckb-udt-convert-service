@@ -159,7 +159,6 @@ async function initiate(params: any): Promise<Result> {
   tx.outputs.push(cell.cellOutput);
   tx.outputsData.push(cell.outputData);
   tx = await funder.prepareTransaction(tx);
-  console.log(udtCellDeps);
   tx.addCellDeps(udtCellDeps);
 
   // Calculate the fee to build final ask / bid tokens
