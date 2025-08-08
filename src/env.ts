@@ -74,6 +74,7 @@ export const udtScript = ccc.Script.from({
   hashType: udts[udtName].hashType,
   args: udtArgs,
 });
+export const udtInfo = udts[udtName];
 export const udtCellDeps = udts[udtName].cellDeps;
 
 export const initialUdtCellCkb = ccc.fixedPointFrom(

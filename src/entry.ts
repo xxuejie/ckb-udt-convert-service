@@ -1,9 +1,11 @@
 import express from "express";
 import { ccc } from "@ckb-ccc/core";
+import Binance from "binance-api-node";
 
 import {
   dbConnection,
   udtName,
+  udtInfo,
   funder,
   refresherQueue,
   assemblerQueue,
@@ -14,9 +16,32 @@ import "./signer";
 import { rpc } from "./rpc";
 
 async function init() {
+  const strategy = env("PRICE_STRATEGY").toLowerCase();
+  switch (strategy) {
+    case "binance":
+      {
+        const client = Binance();
+        client.ws.ticker([udtInfo.binancePairName], async (trade) => {
+          await dbConnection.set(`PRICE:${udtName}`, trade.weightedAvg);
+        });
+      }
+      break;
+    default:
+      {
+        const fixedPrice = ccc.fixedPointFrom(strategy, 6);
+        if (fixedPrice > 0n) {
+          await dbConnection.set(
+            `PRICE:${udtName}`,
+            ccc.fixedPointToString(fixedPrice, 6),
+          );
+        } else {
+          throw new Error(`Unknown price strategy: ${strategy}`);
+        }
+      }
+      break;
+  }
   // TODO: right now the price is hardcoded to 1 CKB == 0.01 USDI,
   // we should allow customizations.
-  await dbConnection.set(`PRICE:${udtName}`, "0.01");
 
   const refresherJob = await refresherQueue.upsertJobScheduler(
     "periodic-refresher",

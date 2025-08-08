@@ -9,7 +9,7 @@ import {
   lockedSeconds,
   signerQueue,
   udtCellDeps,
-  udtName,
+  udtInfo,
   udtScript,
 } from "./env";
 import {
@@ -81,12 +81,12 @@ async function initiate(params: any): Promise<Result> {
   const bidTokensNoFee = outputCapacity - inputCapacity;
 
   // TODO: figure out actual price from binance, for now we simply assume 1 CKB == 0.01 USDI
-  const priceStr = await dbConnection.get(`PRICE:${udtName}`);
+  const priceStr = await dbConnection.get(`PRICE:${udtInfo.human}`);
   if (priceStr === null || priceStr === undefined) {
     return {
       error: {
         code: ERROR_CODE_SERVER,
-        message: `${udtName} price unknown!`,
+        message: `${udtInfo.human} price unknown!`,
       },
     };
   }
