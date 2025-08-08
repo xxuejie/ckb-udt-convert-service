@@ -245,6 +245,10 @@ export const assemblerWorker = new Worker(
 
       const outputs = [];
       const outputsData = [];
+      if (collectedUdtAmount > 0) {
+        outputs.push(collectingCellOutput);
+        outputsData.push(ccc.numLeToBytes(collectedUdtAmount, 16));
+      }
       for (let i = 0; i < outputCount; i++) {
         outputs.push({
           capacity: initialUdtCellCkb,
@@ -252,10 +256,6 @@ export const assemblerWorker = new Worker(
           type: udtScript,
         });
         outputsData.push(ccc.numLeToBytes(0, 16));
-      }
-      if (collectedUdtAmount > 0) {
-        outputs.push(collectingCellOutput);
-        outputsData.push(ccc.numLeToBytes(collectedUdtAmount, 16));
       }
       const spareCellOutput = ccc.CellOutput.from({
         capacity: spareCapacity,
@@ -268,7 +268,7 @@ export const assemblerWorker = new Worker(
         outputs.push(spareCellOutput);
         outputsData.push("0x");
       } else {
-        outputs[0].capacity += spareCapacity;
+        outputs[outputs.length - 1].capacity += spareCapacity;
       }
 
       const tx = await funder.prepareTransaction({
