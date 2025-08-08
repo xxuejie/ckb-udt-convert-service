@@ -10,9 +10,9 @@ local expired_timestamp = ARGV[2]
 local function pop()
   local cell = redis.call("SPOP", live_cells_key)
   if not cell then
-    redis.call("ZADD", locked_cells_key, expired_timestamp, cell)
     return false
   end
+  redis.call("ZADD", locked_cells_key, expired_timestamp, cell)
   return cell
 end
 
@@ -31,7 +31,7 @@ local function purge_locked()
 end
 
 local result = pop()
-if result == nil then
+if not result then
   -- If naive attempt does not work, try purging all expired locked cells, then retry
   purge_locked()
   result = pop()
