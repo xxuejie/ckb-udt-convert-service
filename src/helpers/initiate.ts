@@ -6,7 +6,7 @@ import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
-import { env, buildNoCacheClient, buildUdtScript } from "../utils";
+import { env, buildNoCacheClient } from "../utils";
 
 const rpcClient = new JSONRPCClient(
   (jsonRPCRequest: any): Promise<any> =>
@@ -40,8 +40,14 @@ async function run() {
     env("HELPER_SENDER_PRIVATE_KEY"),
   );
 
+  const udts = JSON.parse(fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"));
+  const udtName = env("ASK_UDT");
   const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
-  const udtScript = await buildUdtScript(signer.client, udtArgs);
+  const udtScript = ccc.Script.from({
+    codeHash: udts[udtName].codeHash,
+    hashType: udts[udtName].hashType,
+    args: udtArgs,
+  });
 
   const recipient = await ccc.Address.fromString(
     env("HELPER_RECIPIENT_ADDRESS"),

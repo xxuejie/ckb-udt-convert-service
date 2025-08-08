@@ -7,11 +7,11 @@ import {
   funder,
   lockedSeconds,
   signerQueue,
-  udtArgs,
+  udtCellDeps,
+  udtScript,
 } from "./env";
 import {
   buildKey,
-  buildUdtScript,
   epoch_timestamp,
   fetchFeeRate,
   Logger,
@@ -60,7 +60,6 @@ async function initiate(params: any): Promise<Result> {
   // TODO: validate input parameters
   let tx = ccc.Transaction.from(params[0]);
 
-  const udtScript = await buildUdtScript(funder.client, udtArgs);
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
     parseInt(currentTimestamp) + lockedSeconds
@@ -142,7 +141,8 @@ async function initiate(params: any): Promise<Result> {
   tx.outputs.push(cell.cellOutput);
   tx.outputsData.push(cell.outputData);
   tx = await funder.prepareTransaction(tx);
-  await tx.addCellDepsOfKnownScripts(funder.client, ccc.KnownScript.XUdt);
+  console.log(udtCellDeps);
+  tx.addCellDeps(udtCellDeps);
 
   // Calculate the fee to build final ask / bid tokens
   const feeRate = await fetchFeeRate(funder.client);

@@ -108,11 +108,6 @@ export function buildKey(prefix: string, content: ccc.BytesLike) {
   return prefix + ccc.hexFrom(content);
 }
 
-export async function buildUdtScript(client: ccc.Client, args: ccc.Hex) {
-  const udtScriptInfo = await client.getKnownScript(ccc.KnownScript.XUdt);
-  return new ccc.Script(udtScriptInfo.codeHash, udtScriptInfo.hashType, args);
-}
-
 export async function fetchFeeRate(client: ccc.Client) {
   try {
     return (await client.getFeeRateStatistics())?.median;

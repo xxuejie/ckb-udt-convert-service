@@ -1,0 +1,15 @@
+{
+  "usdi-udt": {
+    "codeHash": "0x1a1e4fef34f5982906f745b048fe7b1089647e82346074e0f32c2ece26cf6b1e",
+    "hashType": "type",
+    "cellDeps": [
+      {
+        "outPoint": {
+          "txHash": "0x1dbed8dcfe0f18359c65c5e9546fd15cd69de73ea0a502345be30180649c9467",
+          "index": 6
+        },
+        "depType": "code"
+      }
+    ]
+  }
+}

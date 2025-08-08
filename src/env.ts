@@ -63,7 +63,19 @@ export const funder = new ccc.SignerCkbPublicKey(
     new ccc.SignerCkbPrivateKey(ckbClient, env("FUND_POOL_PRIVATE_KEY"))
       .publicKey,
 );
+
+export const udts = JSON.parse(
+  fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"),
+);
+export const udtName = env("ASK_UDT");
 export const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
+export const udtScript = ccc.Script.from({
+  codeHash: udts[udtName].codeHash,
+  hashType: udts[udtName].hashType,
+  args: udtArgs,
+});
+export const udtCellDeps = udts[udtName].cellDeps;
+
 export const initialUdtCellCkb = ccc.fixedPointFrom(
   env("INITIAL_UDT_CELL_CKB"),
 );

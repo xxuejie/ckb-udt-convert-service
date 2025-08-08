@@ -8,7 +8,8 @@ import {
   queueConnection,
   signerQueue,
   funder,
-  udtArgs,
+  udtScript,
+  udtCellDeps,
   minUdtCellCkb,
   initialUdtCellCkb,
   ASSEMBLE_BATCH,
@@ -16,7 +17,6 @@ import {
 import {
   epoch_timestamp,
   buildKey,
-  buildUdtScript,
   fetchFeeRate,
   Logger,
   KEY_LIVE_CELLS,
@@ -31,7 +31,6 @@ export const refresherWorker = new Worker(
   "refresher",
   // TODO: maybe we will need redlock to ensure exclusiveness, maybe not
   async (job) => {
-    const udtScript = await buildUdtScript(funder.client, udtArgs);
     const current_timestamp = epoch_timestamp();
 
     // Here we have 2 kinds of cells:
@@ -139,8 +138,6 @@ refresherWorker.on("failed", (job, error) => {
 export const assemblerWorker = new Worker(
   "assembler",
   async (job) => {
-    const udtScript = await buildUdtScript(funder.client, udtArgs);
-
     // See refresher worker for details
     const queriedUdtCells = await Array.fromAsync(
       funder.findCells(
@@ -256,7 +253,7 @@ export const assemblerWorker = new Worker(
         outputs,
         outputsData,
       });
-      await tx.addCellDepsOfKnownScripts(funder.client, ccc.KnownScript.XUdt);
+      tx.addCellDeps(udtCellDeps);
       await tx.completeFeeChangeToOutput(
         funder,
         outputs.length - 1,

@@ -6,7 +6,7 @@ import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
-import { env, buildNoCacheClient, buildUdtScript } from "../utils";
+import { env, buildNoCacheClient } from "../utils";
 
 async function run() {
   const ckbClient = buildNoCacheClient(
@@ -15,8 +15,14 @@ async function run() {
     env("SCRIPT_CONFIG_FILE"),
   );
 
+  const udts = JSON.parse(fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"));
+  const udtName = env("ASK_UDT");
   const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
-  const udtScript = await buildUdtScript(ckbClient, udtArgs);
+  const udtScript = ccc.Script.from({
+    codeHash: udts[udtName].codeHash,
+    hashType: udts[udtName].hashType,
+    args: udtArgs,
+  });
 
   const address = await ccc.Address.fromString(
     env("HELPER_QUERY_ADDRESS"),
