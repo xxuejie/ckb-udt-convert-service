@@ -100,10 +100,13 @@ async function run() {
   console.log("Request valid until:", valid_until);
   console.log("Ask USDI:", ccc.fixedPointToString(ccc.numFrom(ask_tokens), 6));
   console.log("Bid CKBytes:", ccc.fixedPointToString(ccc.numFrom(bid_tokens)));
-  console.log("Completed tx:", completedTx);
 
   const completedTxStr = JSON.stringify(completedTx, null, "  ");
   fs.writeFileSync(env("HELPER_OUTPUT_COMPLETED_TX"), completedTxStr);
+  console.log(
+    "Completed tx saved to local file:",
+    env("HELPER_OUTPUT_COMPLETED_TX"),
+  );
 }
 
 run();
