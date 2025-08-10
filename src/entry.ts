@@ -67,7 +67,7 @@ async function init() {
     return value;
   });
 
-  app.post("/rpc", (req, res) => {
+  app.post(process.env["RPC_PATH"] || "/rpc", (req, res) => {
     rpc.receive(req.body).then((resp) => {
       if (resp) {
         res.json(resp);
