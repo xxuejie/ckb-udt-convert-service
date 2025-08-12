@@ -1,4 +1,5 @@
 import express from "express";
+import morgan from "morgan";
 import { ccc } from "@ckb-ccc/core";
 import Binance from "binance-api-node";
 
@@ -60,6 +61,7 @@ async function init() {
 
   const app = express();
   app.use(express.json());
+  app.use(morgan("combined"));
   app.set("json replacer", (_: any, value: any) => {
     if (typeof value === "bigint") {
       return ccc.numToHex(value);
