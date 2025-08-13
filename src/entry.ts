@@ -23,7 +23,7 @@ async function init() {
       {
         const client = Binance();
         client.ws.ticker([udtInfo.binancePairName], async (trade) => {
-          await dbConnection.set(`PRICE:${udtName}`, trade.weightedAvg);
+          await dbConnection.setex(`PRICE:${udtName}`, 10, trade.weightedAvg);
         });
       }
       break;
