@@ -90,5 +90,6 @@ if (initialUdtCellCkb / minUdtCellCkb >= ASSEMBLE_BATCH) {
 }
 
 export const lockedSeconds = parseInt(env("LOCKED_SECONDS"));
+export const commitingSeconds = parseInt(env("COMMITING_SECONDS"));
 
 export const incentivePercent = env("INCENTIVE_PERCENT");

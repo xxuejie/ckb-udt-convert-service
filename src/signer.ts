@@ -28,8 +28,9 @@ export const signerWorker = new Worker(
         }
         break;
       case "sign":
-        await dbConnection.set(
+        await dbConnection.setex(
           job.data.targetKey,
+          job.data.ex,
           ccc.hexFrom(signedTx.toBytes()),
         );
         break;

@@ -7,6 +7,7 @@ import {
   funder,
   incentivePercent,
   lockedSeconds,
+  commitingSeconds,
   signerQueue,
   udtCellDeps,
   udtName,
@@ -240,7 +241,7 @@ async function confirm(params: any): Promise<Result> {
 
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
-    parseInt(currentTimestamp) + lockedSeconds
+    parseInt(currentTimestamp) + commitingSeconds
   ).toString();
 
   const lockedCellBytes = ccc.hexFrom(
@@ -286,6 +287,7 @@ async function confirm(params: any): Promise<Result> {
   await signerQueue.add("sign", {
     tx: ccc.hexFrom(tx.toBytes()),
     targetKey: signedTxKey,
+    ex: commitingSeconds * 2,
   });
 
   await backOff(async () => {
