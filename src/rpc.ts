@@ -311,7 +311,6 @@ async function confirm(params: any): Promise<Result> {
       error: {
         code: ERROR_CODE_INVALID_INPUT,
         message,
-        data: signedTx,
       },
     };
   }
