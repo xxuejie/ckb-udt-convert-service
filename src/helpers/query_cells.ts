@@ -17,12 +17,7 @@ async function run() {
 
   const udts = JSON.parse(fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"));
   const udtName = env("ASK_UDT");
-  const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
-  const udtScript = ccc.Script.from({
-    codeHash: udts[udtName].codeHash,
-    hashType: udts[udtName].hashType,
-    args: udtArgs,
-  });
+  const udtScript = ccc.Script.from(udts[udtName].script);
 
   const address = await ccc.Address.fromString(
     env("HELPER_QUERY_ADDRESS"),

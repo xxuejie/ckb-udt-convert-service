@@ -2,8 +2,11 @@
   "usdi-udt": {
     "human": "USDI",
     "binancePairName": "CKBUSDT",
-    "codeHash": "0x1a1e4fef34f5982906f745b048fe7b1089647e82346074e0f32c2ece26cf6b1e",
-    "hashType": "type",
+    "script": {
+      "codeHash": "0x1a1e4fef34f5982906f745b048fe7b1089647e82346074e0f32c2ece26cf6b1e",
+      "hashType": "type",
+      "args": "0x7de82d61a7eb2ec82b0dc653e558ba120efcbfbb44dac87c12972d05bf25065300000000"
+    },
     "cellDeps": [
       {
         "outPoint": {

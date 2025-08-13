@@ -68,12 +68,7 @@ export const udts = JSON.parse(
   fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"),
 );
 export const udtName = env("ASK_UDT");
-export const udtArgs = ccc.hexFrom(env("ASK_UDT_ARGS"));
-export const udtScript = ccc.Script.from({
-  codeHash: udts[udtName].codeHash,
-  hashType: udts[udtName].hashType,
-  args: udtArgs,
-});
+export const udtScript = ccc.Script.from(udts[udtName].script);
 export const udtInfo = udts[udtName];
 export const udtCellDeps = udts[udtName].cellDeps;
 
