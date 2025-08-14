@@ -108,7 +108,6 @@ async function initiate(params: any): Promise<Result> {
   }
   const bidTokensNoFee = outputCapacity - inputCapacity;
 
-  // TODO: figure out actual price from binance, for now we simply assume 1 CKB == 0.01 USDI
   const priceStr = await dbConnection.get(`PRICE:${udtName}`);
   if (priceStr === null || priceStr === undefined) {
     return {
