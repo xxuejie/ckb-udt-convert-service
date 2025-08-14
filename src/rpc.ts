@@ -1,6 +1,7 @@
 import { JSONRPC, JSONRPCID, JSONRPCServer } from "json-rpc-2.0";
 import { backOff } from "exponential-backoff";
 import { ccc } from "@ckb-ccc/core";
+import { cccA } from "@ckb-ccc/core/advanced";
 
 import {
   dbConnection,
@@ -248,7 +249,7 @@ async function initiate(params: any): Promise<Result> {
   return {
     result: {
       valid_until: new Date(parseInt(expiredTimestamp) * 1000).toISOString(),
-      transaction: tx,
+      transaction: cccA.JsonRpcTransformers.transactionFrom(tx),
       ask_tokens: askTokens,
       bid_tokens: bidTokens,
     },
@@ -351,7 +352,7 @@ async function confirm(params: any): Promise<Result> {
 
   return {
     result: {
-      transaction: signedTx,
+      transaction: cccA.JsonRpcTransformers.transactionFrom(signedTx),
     },
   };
 }
