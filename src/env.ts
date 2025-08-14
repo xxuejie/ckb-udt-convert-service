@@ -35,6 +35,13 @@ export const dbConnection = new IORedis(env("REDIS_DB_URL"), {
         "utf8",
       ),
     },
+    cancelCell: {
+      numberOfKeys: 4,
+      lua: fs.readFileSync(
+        path.resolve(__dirname, "..", "lua", "cancel_cell.lua"),
+        "utf8",
+      ),
+    },
     refresh: {
       numberOfKeys: 4,
       lua: fs.readFileSync(

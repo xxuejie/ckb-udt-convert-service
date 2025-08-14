@@ -95,8 +95,13 @@ export const refresherWorker = new Worker(
     )) {
       const txKey = buildKey(KEY_PREFIX_SIGNED_TX, committingCell);
       const clearTx = async () => {
-        await dbConnection.zrem(KEY_COMMITING_CELLS, committingCell);
-        await dbConnection.del(txKey);
+        await (dbConnection as any).cancelCell(
+          KEY_LIVE_CELLS,
+          KEY_LOCKED_CELLS,
+          KEY_COMMITING_CELLS,
+          txKey,
+          committingCell,
+        );
       };
 
       let parsed: ccc.Transaction | null = null;

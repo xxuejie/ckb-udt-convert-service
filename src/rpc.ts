@@ -322,10 +322,15 @@ async function confirm(params: any): Promise<Result> {
     const txHash = await funder.client.sendTransaction(signedTx);
     Logger.info(`Tx ${txHash} submitted to CKB!`);
   } catch (e) {
-    // We will rely on background worker to cleanup database for
-    // failed transactions.
     const message = `Sending transaction ${signedTx.hash()} receives errors: ${e}`;
     Logger.error(message);
+    await (dbConnection as any).cancelCell(
+      KEY_LIVE_CELLS,
+      KEY_LOCKED_CELLS,
+      KEY_COMMITING_CELLS,
+      txKey,
+      lockedCellBytes,
+    );
     return {
       error: {
         code: ERROR_CODE_INVALID_INPUT,
