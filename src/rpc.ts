@@ -120,16 +120,12 @@ async function initiate(params: any): Promise<Result> {
   }
   const udtPricePerCkb = ccc.fixedPointFrom(priceStr, 6);
 
-  const indices = params[1];
-  const availableUdtBalance = tx.outputs.reduce((acc, output, i) => {
-    if (!indices.includes(i)) {
-      return acc;
-    }
-    if (!output.type?.eq(udtScript)) {
-      return acc;
-    }
-
-    return acc + ccc.udtBalanceFrom(tx.outputsData[i]);
+  const indices = params[1].filter(
+    (i: number) =>
+      i >= 0 && i < tx.outputs.length && tx.outputs[i].type?.eq(udtScript),
+  );
+  const availableUdtBalance = tx.outputsData.reduce((acc, data) => {
+    return acc + ccc.udtBalanceFrom(data);
   }, ccc.numFrom(0));
 
   // The estimation here is that the user should always be available to
@@ -214,9 +210,6 @@ async function initiate(params: any): Promise<Result> {
   for (const i of indices) {
     if (charged >= askTokens) {
       break;
-    }
-    if (i < 0 || i >= tx.outputsData.length) {
-      continue;
     }
     const available = ccc.udtBalanceFrom(tx.outputsData[i]);
     let currentCharged = askTokens - charged;
