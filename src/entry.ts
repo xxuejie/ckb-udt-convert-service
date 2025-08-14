@@ -11,7 +11,7 @@ import {
   refresherQueue,
   assemblerQueue,
 } from "./env";
-import { env } from "./utils";
+import { env, Logger } from "./utils";
 import "./workers";
 import "./signer";
 import { rpc } from "./rpc";
@@ -70,13 +70,18 @@ async function init() {
   });
 
   app.post(process.env["RPC_PATH"] || "/rpc", (req, res) => {
-    rpc.receive(req.body).then((resp) => {
-      if (resp) {
-        res.json(resp);
-      } else {
-        res.sendStatus(204);
-      }
-    });
+    try {
+      rpc.receive(req.body).then((resp) => {
+        if (resp) {
+          res.json(resp);
+        } else {
+          res.sendStatus(204);
+        }
+      });
+    } catch (e) {
+      Logger.error("RPC processing error: ", e);
+      res.sendStatus(400);
+    }
   });
 
   app.listen(process.env["PORT"] || 8000);
