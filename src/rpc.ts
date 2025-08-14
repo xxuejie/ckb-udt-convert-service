@@ -290,6 +290,7 @@ async function confirm(params: any): Promise<Result> {
   try {
     const savedTx = ccc.Transaction.fromBytes(savedTxBytes);
     if (!compareTx(tx, savedTx)) {
+      Logger.error(`User provided a modified tx for ${savedTx.hash()}`);
       return INVALID_CELL_ERROR;
     }
   } catch (e) {
