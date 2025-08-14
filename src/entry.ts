@@ -16,6 +16,17 @@ import "./workers";
 import "./signer";
 import { rpc } from "./rpc";
 
+function jsonReplacer(_: any, value: any) {
+  if (typeof value === "bigint") {
+    return ccc.numToHex(value);
+  }
+  return value;
+}
+
+function jsonFormatter(val: any) {
+  return JSON.stringify(val, jsonReplacer, 2);
+}
+
 async function init() {
   const strategy = env("PRICE_STRATEGY").toLowerCase();
   switch (strategy) {
@@ -62,23 +73,18 @@ async function init() {
   const app = express();
   app.use(express.json());
   app.use(morgan("combined"));
-  app.set("json replacer", (_: any, value: any) => {
-    if (typeof value === "bigint") {
-      return ccc.numToHex(value);
-    }
-    return value;
-  });
+  app.set("json replacer", jsonReplacer);
 
   const logRequest = process.env["LOG_REQUEST"] === "true";
   app.post(process.env["RPC_PATH"] || "/rpc", (req, res) => {
     try {
       if (logRequest) {
-        Logger.info("Request body:", ccc.stringify(req.body));
+        Logger.info("Request body:", jsonFormatter(req.body));
       }
       rpc.receive(req.body).then((resp) => {
         if (resp) {
           if (logRequest) {
-            Logger.info("Response body:", ccc.stringify(resp));
+            Logger.info("Response body:", jsonFormatter(resp));
           }
           res.json(resp);
         } else {
