@@ -73,7 +73,7 @@ async function init() {
   app.post(process.env["RPC_PATH"] || "/rpc", (req, res) => {
     try {
       if (logRequest) {
-        Logger.info("Request body:", logRequest);
+        Logger.info("Request body:", req.body);
       }
       rpc.receive(req.body).then((resp) => {
         if (resp) {
