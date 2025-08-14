@@ -17,6 +17,7 @@ import {
 import {
   buildKey,
   calculateBidUdts,
+  env,
   epoch_timestamp,
   fetchFeeRate,
   Logger,
@@ -69,6 +70,31 @@ async function initiate(params: any): Promise<Result> {
   const expiredTimestamp = (
     parseInt(currentTimestamp) + lockedSeconds
   ).toString();
+
+  {
+    const funderScript = (await funder.getAddressObjSecp256k1()).script;
+    const collectingScript = (
+      await ccc.Address.fromString(
+        env("COLLECTING_POOL_ADDRESS"),
+        funder.client,
+      )
+    ).script;
+
+    for (const input of tx.inputs) {
+      const cell = await input.getCell(funder.client);
+      if (
+        cell.cellOutput.lock.eq(funderScript) ||
+        cell.cellOutput.lock.eq(collectingScript)
+      ) {
+        return {
+          error: {
+            code: ERROR_CODE_INVALID_INPUT,
+            message: "Input cells uses invalid lock script!",
+          },
+        };
+      }
+    }
+  }
 
   const inputCapacity = await tx.getInputsCapacity(funder.client);
   const outputCapacity = tx.getOutputsCapacity();
