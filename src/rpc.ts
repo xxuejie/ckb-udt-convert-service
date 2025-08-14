@@ -120,11 +120,21 @@ async function initiate(params: any): Promise<Result> {
   }
   const udtPricePerCkb = ccc.fixedPointFrom(priceStr, 6);
 
-  const indices = params[1].filter(
-    (i: number) =>
-      i >= 0 && i < tx.outputs.length && tx.outputs[i].type?.eq(udtScript),
-  );
-  const availableUdtBalance = tx.outputsData.reduce((acc, data) => {
+  const indices = params[1];
+  for (const i of indices) {
+    if (i < 0 || i >= tx.outputs.length || !tx.outputs[i].type?.eq(udtScript)) {
+      return {
+        error: {
+          code: ERROR_CODE_SERVER,
+          message: `Invalid indices!`,
+        },
+      };
+    }
+  }
+  const availableUdtBalance = tx.outputsData.reduce((acc, data, i) => {
+    if (!indices.includes(i)) {
+      return acc;
+    }
     return acc + ccc.udtBalanceFrom(data);
   }, ccc.numFrom(0));
 
