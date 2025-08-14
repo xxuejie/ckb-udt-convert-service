@@ -25,7 +25,7 @@ export const Logger = {
 
 process.on("unhandledRejection", (reason, promise) => {
   Logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  // process.exit(1);
 });
 
 function assertIsDefined<T>(value: T | undefined | null, message?: string): T {
