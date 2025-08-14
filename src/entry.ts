@@ -69,10 +69,17 @@ async function init() {
     return value;
   });
 
+  const logRequest = process.env["LOG_REQUEST"] === "true;";
   app.post(process.env["RPC_PATH"] || "/rpc", (req, res) => {
     try {
+      if (logRequest) {
+        Logger.info("Request body:", logRequest);
+      }
       rpc.receive(req.body).then((resp) => {
         if (resp) {
+          if (logRequest) {
+            Logger.info("Response body:", JSON.stringify(resp));
+          }
           res.json(resp);
         } else {
           res.sendStatus(204);
