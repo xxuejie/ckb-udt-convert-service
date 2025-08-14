@@ -78,7 +78,7 @@ async function init() {
       rpc.receive(req.body).then((resp) => {
         if (resp) {
           if (logRequest) {
-            Logger.info("Response body:", JSON.stringify(resp));
+            Logger.info("Response body:", ccc.stringify(resp));
           }
           res.json(resp);
         } else {
