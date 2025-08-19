@@ -36,27 +36,69 @@ import {
 export const rpc = new JSONRPCServer();
 
 rpc.addMethodAdvanced("initiate", async (request) => {
-  return buildResponse(await initiate(request.params), request);
+  const params = buildParams(request.params);
+  return buildResponse(params.c, await initiate(params), request.id || null);
 });
 
 rpc.addMethodAdvanced("confirm", async (request) => {
-  return buildResponse(await confirm(request.params), request);
+  const params = buildParams(request.params);
+  return buildResponse(params.c, await confirm(params), request.id || null);
 });
+
+type Case = "camel" | "snake";
+
+interface Params {
+  c: Case;
+  tx: ccc.Transaction;
+  others: any[];
+}
 
 interface Result {
   result?: any;
   error?: { code: number; message: string; data?: any };
 }
 
-function buildResponse(
-  result: Result,
-  request: { id?: JSONRPCID; params?: JSONRPCParams },
-) {
+function buildParams(params?: JSONRPCParams): Params {
+  let c = "camel" as Case;
+  if (!_.isArray(params)) {
+    throw new Error("Params must be an array!");
+  }
+  if (params[params.length - 1] === "snake") {
+    c = "snake";
+    params.pop();
+  }
+  const txData = params.shift();
+  if (!_.isObject(txData)) {
+    throw new Error("The first element in params must be the tx object!");
+  }
+  if (_.has(txData, "outputs_data")) {
+    c = "snake";
+  }
+  // TODO: validate input parameters
+  const tx =
+    c === "camel"
+      ? ccc.Transaction.from(txData)
+      : cccA.JsonRpcTransformers.transactionTo(txData as any);
+  return {
+    c,
+    tx,
+    others: params,
+  };
+}
+
+function buildTx(c: Case, tx: ccc.Transaction) {
+  if (c === "camel") {
+    return tx;
+  } else {
+    return cccA.JsonRpcTransformers.transactionFrom(tx);
+  }
+}
+
+function buildResponse(c: Case, result: Result, id: JSONRPCID | null) {
   const base = {
     jsonrpc: JSONRPC,
-    id: request.id || null,
+    id: id || null,
   };
-  const c = inferCase(request.params);
   if (result.error !== undefined) {
     return Object.assign({}, base, {
       error: result.error,
@@ -66,20 +108,6 @@ function buildResponse(
       result: transformResultCase(c, result.result),
     });
   }
-}
-
-type Case = "camel" | "snake";
-
-function inferCase(params?: JSONRPCParams): Case {
-  if (_.isArray(params) && params.length > 0) {
-    if (params[params.length - 1] == "snake") {
-      return "snake";
-    }
-    if (_.isObject(params[0]) && _.has(params[0], "outputs_data")) {
-      return "snake";
-    }
-  }
-  return "camel";
 }
 
 function transformResultCase(c: Case, result?: any): any {
@@ -107,9 +135,8 @@ function snakeToCamel(obj: any) {
 const ERROR_CODE_INVALID_INPUT = 2001;
 const ERROR_CODE_SERVER = 2002;
 
-async function initiate(params: any): Promise<Result> {
-  // TODO: validate input parameters
-  let tx = ccc.Transaction.from(snakeToCamel(params[0]));
+async function initiate(params: Params): Promise<Result> {
+  let tx = params.tx;
 
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
@@ -164,7 +191,7 @@ async function initiate(params: any): Promise<Result> {
   }
   const udtPricePerCkb = ccc.fixedPointFrom(priceStr, 6);
 
-  const indices = params[1];
+  const indices = params.others[0];
   for (const i of indices) {
     if (i < 0 || i >= tx.outputs.length || !tx.outputs[i].type?.eq(udtScript)) {
       return {
@@ -321,16 +348,15 @@ async function initiate(params: any): Promise<Result> {
   return {
     result: {
       valid_until: new Date(parseInt(expiredTimestamp) * 1000).toISOString(),
-      transaction: cccA.JsonRpcTransformers.transactionFrom(tx),
+      transaction: buildTx(params.c, tx),
       ask_tokens: askTokens,
       bid_tokens: bidTokens,
     },
   };
 }
 
-async function confirm(params: any): Promise<Result> {
-  // TODO: validate input parameters
-  let tx = ccc.Transaction.from(snakeToCamel(params[0]));
+async function confirm(params: Params): Promise<Result> {
+  let tx = params.tx;
   if (tx.inputs.length === 0) {
     return {
       error: {
@@ -360,7 +386,7 @@ async function confirm(params: any): Promise<Result> {
   }
   try {
     const savedTx = ccc.Transaction.fromBytes(savedTxBytes);
-    if (!compareTx(tx, savedTx)) {
+    if (!(await compareTx(tx, savedTx))) {
       Logger.error(`User provided a modified tx for ${savedTx.hash()}`);
       return INVALID_CELL_ERROR;
     }
@@ -428,24 +454,30 @@ async function confirm(params: any): Promise<Result> {
 
   return {
     result: {
-      transaction: cccA.JsonRpcTransformers.transactionFrom(signedTx),
+      transaction: buildTx(params.c, tx),
     },
   };
 }
 
 // Only witnesses belonging to users can be tweaked(mainly for signatures)
-function compareTx(tx: ccc.Transaction, savedTx: ccc.Transaction): boolean {
+async function compareTx(
+  tx: ccc.Transaction,
+  savedTx: ccc.Transaction,
+): Promise<boolean> {
   if (
     tx.hash() !== savedTx.hash() ||
-    tx.witnesses.length !== savedTx.witnesses.length ||
-    tx.witnesses[tx.witnesses.length - 1] !==
-      savedTx.witnesses[savedTx.witnesses.length - 1]
+    tx.witnesses.length !== savedTx.witnesses.length
   ) {
     return false;
   }
-  for (let i = 0; i < tx.witnesses.length - 1; i++) {
-    if (tx.witnesses[i].length !== savedTx.witnesses[i].length) {
-      return false;
+
+  const funderScript = (await funder.getAddressObjSecp256k1()).script;
+  for (let i = 0; i < tx.witnesses.length; i++) {
+    const inputCell = await tx.inputs[i].getCell(funder.client);
+    if (inputCell.cellOutput.lock.eq(funderScript)) {
+      if (tx.witnesses[i].length !== savedTx.witnesses[i].length) {
+        return false;
+      }
     }
   }
   return true;

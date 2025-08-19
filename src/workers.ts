@@ -125,11 +125,13 @@ export const refresherWorker = new Worker(
         }
       }
     }
-    await dbConnection
-      .multi()
-      .del(KEY_PENDING_TXS)
-      .rpush(KEY_PENDING_TXS, ...remainingTxs)
-      .exec();
+    if (remainingTxs.length > 0) {
+      await dbConnection
+        .multi()
+        .del(KEY_PENDING_TXS)
+        .rpush(KEY_PENDING_TXS, ...remainingTxs)
+        .exec();
+    }
   },
   { connection: queueConnection },
 );

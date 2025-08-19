@@ -14,7 +14,7 @@ export const signerWorker = new Worker(
   async (job) => {
     // For now we let BullMQ handles decoding failure
     const tx = ccc.Transaction.fromBytes(ccc.bytesFrom(job.data.tx));
-    const signedTx = await signer.signTransaction(tx);
+    const signedTx = await signer.signOnlyTransaction(tx);
 
     switch (job.name) {
       case "sign_send":
