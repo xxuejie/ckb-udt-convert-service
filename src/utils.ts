@@ -1,6 +1,7 @@
 import pino from "pino";
 import { ccc } from "@ckb-ccc/core";
 import { cccA } from "@ckb-ccc/core/advanced";
+import IORedis from "ioredis";
 
 import fs from "fs";
 import util from "util";
@@ -98,6 +99,7 @@ export function epoch_timestamp(): string {
 export const KEY_LIVE_CELLS = "LIVE_CELLS";
 export const KEY_LOCKED_CELLS = "LOCKED_CELLS";
 export const KEY_COMMITING_CELLS = "COMMITING_CELLS";
+export const KEY_PENDING_TXS = "PENDING_TXS";
 
 export const KEY_PREFIX_CKB_CELLS = "_CKB_CELLS:";
 export const KEY_PREFIX_CELL = "CELL:";
@@ -147,4 +149,32 @@ export function calculateBidUdts(
   const bidUdts = normalizedCkbytes.mul(updatedPrice);
 
   return ccc.fixedPointFrom(bidUdts.toDecimalString(), 6);
+}
+
+export function txExternalKey(tx: ccc.Transaction): ccc.Hex {
+  return ccc.hexFrom(tx.inputs[tx.inputs.length - 1].previousOutput.toBytes());
+}
+
+export async function cancelAllCommitingCells(
+  tx: ccc.Transaction,
+  funder: ccc.SignerCkbPublicKey,
+  dbConnection: IORedis,
+) {
+  const keyCellBytes = txExternalKey(tx);
+  const txKey = buildKey(KEY_PREFIX_TX, keyCellBytes);
+  const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, keyCellBytes);
+  const funderScript = (await funder.getAddressObjSecp256k1()).script;
+
+  for (const input of tx.inputs) {
+    const inputCell = await input.getCell(funder.client);
+    if (inputCell.cellOutput.lock.eq(funderScript)) {
+      await (dbConnection as any).cancelCell(
+        KEY_LOCKED_CELLS,
+        KEY_COMMITING_CELLS,
+        txKey,
+        signedTxKey,
+        ccc.hexFrom(input.previousOutput.toBytes()),
+      );
+    }
+  }
 }

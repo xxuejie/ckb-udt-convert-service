@@ -18,11 +18,13 @@ import {
   epoch_timestamp,
   env,
   buildKey,
+  cancelAllCommitingCells,
   fetchFeeRate,
   Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
   KEY_COMMITING_CELLS,
+  KEY_PENDING_TXS,
   KEY_PREFIX_CKB_CELLS,
   KEY_PREFIX_CELL,
   KEY_PREFIX_SIGNED_TX,
@@ -87,34 +89,23 @@ export const refresherWorker = new Worker(
       current_timestamp,
     );
 
-    // Resend transactions for committing cells to CKB if not yet committed
-    for (const committingCell of await dbConnection.zrange(
-      KEY_COMMITING_CELLS,
-      0,
-      -1,
-    )) {
-      const txKey = buildKey(KEY_PREFIX_SIGNED_TX, committingCell);
-      const clearTx = async () => {
-        await (dbConnection as any).cancelCell(
-          KEY_LIVE_CELLS,
-          KEY_LOCKED_CELLS,
-          KEY_COMMITING_CELLS,
-          txKey,
-          committingCell,
-        );
-      };
-
+    // Resend pending transactions for committing cells if not yet committed
+    const pendingTxs = await dbConnection.lrange(KEY_PENDING_TXS, 0, -1);
+    const remainingTxs = [];
+    for (const txData of pendingTxs) {
       let parsed: ccc.Transaction | null = null;
       try {
-        const txData = await dbConnection.get(txKey);
         parsed = ccc.Transaction.fromBytes(txData!);
       } catch (e) {
         Logger.error("Error parsing commiting tx:", e);
-        await clearTx();
         continue;
       }
       const tx = parsed!;
       const txHash = tx.hash();
+
+      const clearTx = async () => {
+        await cancelAllCommitingCells(tx, funder, dbConnection);
+      };
 
       const txStatus = (await funder.client.getTransactionNoCache(txHash))!
         .status;
@@ -127,12 +118,18 @@ export const refresherWorker = new Worker(
         // Try resending the transaction
         try {
           await funder.client.sendTransaction(tx);
+          remainingTxs.push(txData);
         } catch (e) {
           Logger.error(`Sending transaction ${txHash} receives errors: ${e}`);
           await clearTx();
         }
       }
     }
+    await dbConnection
+      .multi()
+      .del(KEY_PENDING_TXS)
+      .rpush(KEY_PENDING_TXS, ...remainingTxs)
+      .exec();
   },
   { connection: queueConnection },
 );

@@ -19,13 +19,16 @@ import {
 import {
   buildKey,
   calculateBidUdts,
+  cancelAllCommitingCells,
   env,
   epoch_timestamp,
   fetchFeeRate,
+  txExternalKey,
   Logger,
   KEY_LIVE_CELLS,
   KEY_LOCKED_CELLS,
   KEY_COMMITING_CELLS,
+  KEY_PENDING_TXS,
   KEY_PREFIX_TX,
   KEY_PREFIX_SIGNED_TX,
 } from "./utils";
@@ -183,10 +186,11 @@ async function initiate(params: any): Promise<Result> {
   // trade one more CKBytes, so as to cover for fees. The actual charged
   // fees will be calculated below and are typically much less than 1 CKB.
   const MAXIMUM_FEE = ccc.fixedPointFrom("1");
+  const requestedCapacity = bidTokensNoFee + MAXIMUM_FEE;
   const estimateAskTokens = calculateBidUdts(
     udtPricePerCkb,
     incentivePercent,
-    bidTokensNoFee + MAXIMUM_FEE,
+    requestedCapacity,
   );
   if (availableUdtBalance <= estimateAskTokens) {
     return {
@@ -197,41 +201,47 @@ async function initiate(params: any): Promise<Result> {
     };
   }
 
-  // Lock a live cell for current tx
-  const outPointBytes = await (dbConnection as any).lockCell(
-    KEY_LIVE_CELLS,
-    KEY_LOCKED_CELLS,
-    KEY_COMMITING_CELLS,
-    currentTimestamp,
-    expiredTimestamp,
-  );
-  if (!outPointBytes) {
-    return {
-      error: {
-        code: ERROR_CODE_SERVER,
-        message: "No live cell is available for converting!",
-      },
-    };
-  }
-  const outPoint = ccc.OutPoint.fromBytes(outPointBytes);
-  const cell = await funder.client.getCellLive(outPoint, true);
-  if (cell === null || cell === undefined) {
-    return {
-      error: {
-        code: ERROR_CODE_SERVER,
-        message: "Server data mismatch!",
-      },
-    };
-  }
+  let availableCapacity = 0n;
+  // Lock one or more cells to provide ckbytes for current tx
+  const capacityCellStartIndex = tx.outputs.length;
+  while (availableCapacity < requestedCapacity) {
+    const outPointBytes = await (dbConnection as any).lockCell(
+      KEY_LIVE_CELLS,
+      KEY_LOCKED_CELLS,
+      KEY_COMMITING_CELLS,
+      currentTimestamp,
+      expiredTimestamp,
+    );
+    if (!outPointBytes) {
+      return {
+        error: {
+          code: ERROR_CODE_SERVER,
+          message: "No live cell is available for converting!",
+        },
+      };
+    }
+    const outPoint = ccc.OutPoint.fromBytes(outPointBytes);
+    const cell = await funder.client.getCellLive(outPoint, true);
+    if (cell === null || cell === undefined) {
+      return {
+        error: {
+          code: ERROR_CODE_SERVER,
+          message: "Server data mismatch!",
+        },
+      };
+    }
 
-  tx.inputs.push(
-    ccc.CellInput.from({
-      previousOutput: outPoint,
-    }),
-  );
-  // We will do the actual CKB / UDT manipulation later when we can calculate the fee
-  tx.outputs.push(cell.cellOutput);
-  tx.outputsData.push(cell.outputData);
+    tx.inputs.push(
+      ccc.CellInput.from({
+        previousOutput: outPoint,
+      }),
+    );
+    // We will do the actual CKB / UDT manipulation later when we can calculate the fee
+    tx.outputs.push(cell.cellOutput);
+    tx.outputsData.push(cell.outputData);
+
+    availableCapacity += cell.capacityFree;
+  }
   tx = await funder.prepareTransaction(tx);
   tx.addCellDeps(udtCellDeps);
 
@@ -246,15 +256,36 @@ async function initiate(params: any): Promise<Result> {
     bidTokens,
   );
 
-  // Modify the last output(our cell) to charge +bidTokens+ CKBytes,
-  // and collect +askTokens+ UDTs
-  tx.outputs[tx.outputs.length - 1].capacity -= bidTokens;
-  tx.outputsData[tx.outputs.length - 1] = ccc.hexFrom(
-    ccc.numLeToBytes(
-      ccc.udtBalanceFrom(tx.outputsData[tx.outputs.length - 1]) + askTokens,
-      16,
-    ),
-  );
+  // Modify locked cells to charge +bidTokens+ CKBytes, collect +askTokens+ UDTs
+  {
+    tx.outputsData[capacityCellStartIndex] = ccc.hexFrom(
+      ccc.numLeToBytes(
+        ccc.udtBalanceFrom(tx.outputsData[capacityCellStartIndex]) + askTokens,
+        16,
+      ),
+    );
+    let charged = 0n;
+    for (
+      let i = capacityCellStartIndex;
+      i < tx.outputs.length && charged <= bidTokens;
+      i++
+    ) {
+      const cell = ccc.Cell.from({
+        previousOutput: ccc.OutPoint.from({
+          txHash: tx.hash(),
+          index: i,
+        }),
+        cellOutput: tx.outputs[i],
+        outputData: tx.outputsData[i],
+      });
+      let currentCharged = cell.capacityFree;
+      if (currentCharged > bidTokens - charged) {
+        currentCharged = bidTokens - charged;
+      }
+      tx.outputs[i].capacity -= currentCharged;
+      charged += currentCharged;
+    }
+  }
 
   // Charge +askTokens+ UDTs from output cells indices by +indices+
   let charged = 0n;
@@ -282,7 +313,7 @@ async function initiate(params: any): Promise<Result> {
 
   // A larger EX value is safer, and won't cost us too much here.
   await dbConnection.setex(
-    buildKey(KEY_PREFIX_TX, outPointBytes),
+    buildKey(KEY_PREFIX_TX, txExternalKey(tx)),
     lockedSeconds * 2,
     ccc.hexFrom(tx.toBytes()),
   );
@@ -314,10 +345,8 @@ async function confirm(params: any): Promise<Result> {
     parseInt(currentTimestamp) + commitingSeconds
   ).toString();
 
-  const lockedCellBytes = ccc.hexFrom(
-    tx.inputs[tx.inputs.length - 1].previousOutput.toBytes(),
-  );
-  const txKey = buildKey(KEY_PREFIX_TX, lockedCellBytes);
+  const keyBytes = txExternalKey(tx);
+  const txKey = buildKey(KEY_PREFIX_TX, keyBytes);
   const savedTxBytes = await dbConnection.get(txKey);
 
   const INVALID_CELL_ERROR = {
@@ -340,21 +369,30 @@ async function confirm(params: any): Promise<Result> {
     return INVALID_CELL_ERROR;
   }
 
-  const commitResult = await (dbConnection as any).commitCell(
-    KEY_LIVE_CELLS,
-    KEY_LOCKED_CELLS,
-    KEY_COMMITING_CELLS,
-    txKey,
-    lockedCellBytes,
-    currentTimestamp,
-    expiredTimestamp,
-  );
-  if (!commitResult) {
-    return INVALID_CELL_ERROR;
-  }
-  await dbConnection.del(txKey);
+  {
+    // Commit all funder cells
+    const funderScript = (await funder.getAddressObjSecp256k1()).script;
 
-  const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, lockedCellBytes);
+    for (const input of tx.inputs) {
+      const inputCell = await input.getCell(funder.client);
+      if (inputCell.cellOutput.lock.eq(funderScript)) {
+        const commitResult = await (dbConnection as any).commitCell(
+          KEY_LIVE_CELLS,
+          KEY_LOCKED_CELLS,
+          KEY_COMMITING_CELLS,
+          txKey,
+          ccc.hexFrom(input.previousOutput.toBytes()),
+          currentTimestamp,
+          expiredTimestamp,
+        );
+        if (!commitResult) {
+          return INVALID_CELL_ERROR;
+        }
+      }
+    }
+  }
+
+  const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, keyBytes);
   await signerQueue.add("sign", {
     tx: ccc.hexFrom(tx.toBytes()),
     targetKey: signedTxKey,
@@ -370,19 +408,15 @@ async function confirm(params: any): Promise<Result> {
   const signedTx = ccc.Transaction.fromBytes(
     (await dbConnection.get(signedTxKey))!,
   );
+
   try {
     const txHash = await funder.client.sendTransaction(signedTx);
     Logger.info(`Tx ${txHash} submitted to CKB!`);
   } catch (e) {
     const message = `Sending transaction ${signedTx.hash()} receives errors: ${e}`;
     Logger.error(message);
-    await (dbConnection as any).cancelCell(
-      KEY_LIVE_CELLS,
-      KEY_LOCKED_CELLS,
-      KEY_COMMITING_CELLS,
-      txKey,
-      lockedCellBytes,
-    );
+    await cancelAllCommitingCells(signedTx, funder, dbConnection);
+
     return {
       error: {
         code: ERROR_CODE_INVALID_INPUT,
@@ -390,6 +424,7 @@ async function confirm(params: any): Promise<Result> {
       },
     };
   }
+  await dbConnection.rpush(KEY_PENDING_TXS, ccc.hexFrom(signedTx.toBytes()));
 
   return {
     result: {
