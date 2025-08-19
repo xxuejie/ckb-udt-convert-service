@@ -87,14 +87,14 @@ async function run() {
   await tx.prepareSighashAllWitness(signerLock, 65, signer.client);
 
   const {
-    valid_until,
+    validUntil,
     transaction: completedTx,
-    ask_tokens,
-    bid_tokens,
+    askTokens,
+    bidTokens,
   } = await rpcClient.request("initiate", [tx, [1]]);
-  console.log("Request valid until:", valid_until);
-  console.log("Ask USDI:", ccc.fixedPointToString(ccc.numFrom(ask_tokens), 6));
-  console.log("Bid CKBytes:", ccc.fixedPointToString(ccc.numFrom(bid_tokens)));
+  console.log("Request valid until:", validUntil);
+  console.log("Ask USDI:", ccc.fixedPointToString(ccc.numFrom(askTokens), 6));
+  console.log("Bid CKBytes:", ccc.fixedPointToString(ccc.numFrom(bidTokens)));
 
   const completedTxStr = JSON.stringify(completedTx, null, "  ");
   fs.writeFileSync(env("HELPER_OUTPUT_COMPLETED_TX"), completedTxStr);

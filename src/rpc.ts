@@ -1,7 +1,8 @@
-import { JSONRPC, JSONRPCID, JSONRPCServer } from "json-rpc-2.0";
+import { JSONRPC, JSONRPCID, JSONRPCServer, JSONRPCParams } from "json-rpc-2.0";
 import { backOff } from "exponential-backoff";
 import { ccc } from "@ckb-ccc/core";
 import { cccA } from "@ckb-ccc/core/advanced";
+import _ from "lodash";
 
 import {
   dbConnection,
@@ -44,20 +45,60 @@ interface Result {
   error?: { code: number; message: string; data?: any };
 }
 
-function buildResponse(result: Result, request: { id?: JSONRPCID }) {
+function buildResponse(
+  result: Result,
+  request: { id?: JSONRPCID; params?: JSONRPCParams },
+) {
   const base = {
     jsonrpc: JSONRPC,
     id: request.id || null,
   };
+  const c = inferCase(request.params);
   if (result.error !== undefined) {
     return Object.assign({}, base, {
       error: result.error,
     });
   } else {
     return Object.assign({}, base, {
-      result: result.result,
+      result: transformResultCase(c, result.result),
     });
   }
+}
+
+type Case = "camel" | "snake";
+
+function inferCase(params?: JSONRPCParams): Case {
+  if (_.isArray(params) && params.length > 0) {
+    if (params[params.length - 1] == "snake") {
+      return "snake";
+    }
+    if (_.isObject(params[0]) && _.has(params[0], "outputs_data")) {
+      return "snake";
+    }
+  }
+  return "camel";
+}
+
+function transformResultCase(c: Case, result?: any): any {
+  if (c === "camel") {
+    return snakeToCamel(result);
+  } else {
+    return camelToSnake(result);
+  }
+}
+
+function camelToSnake(obj: any) {
+  return _.transform(obj, (result: any, value, key: string) => {
+    const snakeKey = _.snakeCase(key);
+    result[snakeKey] = _.isObject(value) ? camelToSnake(value) : value;
+  });
+}
+
+function snakeToCamel(obj: any) {
+  return _.transform(obj, (result: any, value, key: string) => {
+    const snakeKey = _.camelCase(key);
+    result[snakeKey] = _.isObject(value) ? snakeToCamel(value) : value;
+  });
 }
 
 const ERROR_CODE_INVALID_INPUT = 2001;
@@ -65,7 +106,7 @@ const ERROR_CODE_SERVER = 2002;
 
 async function initiate(params: any): Promise<Result> {
   // TODO: validate input parameters
-  let tx = ccc.Transaction.from(params[0]);
+  let tx = ccc.Transaction.from(snakeToCamel(params[0]));
 
   const currentTimestamp = epoch_timestamp();
   const expiredTimestamp = (
@@ -258,7 +299,7 @@ async function initiate(params: any): Promise<Result> {
 
 async function confirm(params: any): Promise<Result> {
   // TODO: validate input parameters
-  let tx = ccc.Transaction.from(params[0]);
+  let tx = ccc.Transaction.from(snakeToCamel(params[0]));
   if (tx.inputs.length === 0) {
     return {
       error: {
