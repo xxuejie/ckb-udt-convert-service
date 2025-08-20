@@ -231,6 +231,7 @@ async function initiate(params: Params): Promise<Result> {
   let availableCapacity = 0n;
   // Lock one or more cells to provide ckbytes for current tx
   const capacityCellStartIndex = tx.outputs.length;
+  let locked = false;
   while (availableCapacity < requestedCapacity) {
     const outPointBytes = await (dbConnection as any).lockCell(
       KEY_LIVE_CELLS,
@@ -267,7 +268,14 @@ async function initiate(params: Params): Promise<Result> {
     tx.outputs.push(cell.cellOutput);
     tx.outputsData.push(cell.outputData);
 
-    availableCapacity += cell.capacityFree;
+    // We will keep the first locked cell, all locked cells after the first can be
+    // destructed.
+    if (locked) {
+      availableCapacity += cell.cellOutput.capacity;
+    } else {
+      availableCapacity += cell.capacityFree;
+    }
+    locked = true;
   }
   tx = await funder.prepareTransaction(tx);
   tx.addCellDeps(udtCellDeps);
@@ -291,10 +299,27 @@ async function initiate(params: Params): Promise<Result> {
         16,
       ),
     );
+    // The first output cell needs to be kept so as to collect UDTs
     let charged = 0n;
+    {
+      const cell = ccc.Cell.from({
+        previousOutput: ccc.OutPoint.from({
+          txHash: tx.hash(),
+          index: capacityCellStartIndex,
+        }),
+        cellOutput: tx.outputs[capacityCellStartIndex],
+        outputData: tx.outputsData[capacityCellStartIndex],
+      });
+      charged = cell.capacityFree;
+      if (charged > bidTokens) {
+        charged = bidTokens;
+      }
+      tx.outputs[capacityCellStartIndex].capacity -= charged;
+    }
+
     for (
-      let i = capacityCellStartIndex;
-      i < tx.outputs.length && charged <= bidTokens;
+      let i = capacityCellStartIndex + 1;
+      i < tx.outputs.length && charged < bidTokens;
       i++
     ) {
       const cell = ccc.Cell.from({
@@ -305,37 +330,75 @@ async function initiate(params: Params): Promise<Result> {
         cellOutput: tx.outputs[i],
         outputData: tx.outputsData[i],
       });
-      let currentCharged = cell.capacityFree;
-      if (currentCharged > bidTokens - charged) {
-        currentCharged = bidTokens - charged;
+
+      let currentCharged = bidTokens - charged;
+      if (currentCharged > cell.cellOutput.capacity) {
+        // Consumes full output cell, we need to move UDTs if there are any
+        currentCharged = cell.cellOutput.capacity;
+        tx.outputsData[capacityCellStartIndex] = ccc.hexFrom(
+          ccc.numLeToBytes(
+            ccc.udtBalanceFrom(tx.outputsData[capacityCellStartIndex]) +
+              ccc.udtBalanceFrom(tx.outputsData[i]),
+            16,
+          ),
+        );
+        tx.outputs.splice(i, 1);
+        tx.outputsData.splice(i, 1);
+        i--;
+      } else if (currentCharged > cell.capacityFree) {
+        // Consumes output cell, but there are left over CKBytes that are not enough for a cell
+        tx.outputsData[capacityCellStartIndex] = ccc.hexFrom(
+          ccc.numLeToBytes(
+            ccc.udtBalanceFrom(tx.outputsData[capacityCellStartIndex]) +
+              ccc.udtBalanceFrom(tx.outputsData[i]),
+            16,
+          ),
+        );
+        tx.outputs[capacityCellStartIndex].capacity +=
+          cell.cellOutput.capacity - currentCharged;
+        tx.outputs.splice(i, 1);
+        tx.outputsData.splice(i, 1);
+        i--;
+      } else {
+        // Consumes free CKBytes of output cell
+        tx.outputs[i].capacity -= currentCharged;
       }
-      tx.outputs[i].capacity -= currentCharged;
       charged += currentCharged;
+    }
+    if (charged < bidTokens) {
+      return {
+        error: {
+          code: ERROR_CODE_SERVER,
+          message: `At least ${bidTokens} CKBytes must be available!`,
+        },
+      };
     }
   }
 
   // Charge +askTokens+ UDTs from output cells indices by +indices+
-  let charged = 0n;
-  for (const i of indices) {
-    if (charged >= askTokens) {
-      break;
+  {
+    let charged = 0n;
+    for (const i of indices) {
+      if (charged >= askTokens) {
+        break;
+      }
+      const available = ccc.udtBalanceFrom(tx.outputsData[i]);
+      let currentCharged = askTokens - charged;
+      if (currentCharged > available) {
+        currentCharged = available;
+      }
+      const left = available - currentCharged;
+      tx.outputsData[i] = ccc.hexFrom(ccc.numLeToBytes(left, 16));
+      charged += currentCharged;
     }
-    const available = ccc.udtBalanceFrom(tx.outputsData[i]);
-    let currentCharged = askTokens - charged;
-    if (currentCharged > available) {
-      currentCharged = available;
+    if (charged < askTokens) {
+      return {
+        error: {
+          code: ERROR_CODE_INVALID_INPUT,
+          message: `At least ${askTokens} UDT tokens must be available to convert to CKB!`,
+        },
+      };
     }
-    const left = available - currentCharged;
-    tx.outputsData[i] = ccc.hexFrom(ccc.numLeToBytes(left, 16));
-    charged += currentCharged;
-  }
-  if (charged < askTokens) {
-    return {
-      error: {
-        code: ERROR_CODE_INVALID_INPUT,
-        message: `At least ${askTokens} UDT tokens must be available to convert to CKB!`,
-      },
-    };
   }
 
   // A larger EX value is safer, and won't cost us too much here.

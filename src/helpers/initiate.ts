@@ -52,11 +52,16 @@ async function run() {
   const sendAmount = ccc.fixedPointFrom(env("HELPER_SEND_UDT_AMOUNT"), 6);
   // Spare amounts are set aside to pay for converted CKBs
   const spareAmount = ccc.fixedPointFrom(env("HELPER_SPARE_AMOUNT"), 6);
+  const count = BigInt(process.env["HELPER_SEND_COUNT"] || "1");
 
-  const tx = ccc.Transaction.from({
-    outputs: [{ lock: recipient.script, type: udtScript }],
-    outputsData: [ccc.numLeToBytes(sendAmount, 16)],
-  });
+  const tx = ccc.Transaction.from({});
+  for (let i = 0n; i < count; i++) {
+    tx.addOutput(
+      { lock: recipient.script, type: udtScript },
+      ccc.numLeToBytes(sendAmount, 16),
+    );
+  }
+
   await tx.completeInputsByUdt(signer, udtScript, spareAmount);
   const inputsCapacity = await tx.getInputsCapacity(signer.client);
   const inputsAmount = await tx.getInputsUdtBalance(signer.client, udtScript);
@@ -68,7 +73,7 @@ async function run() {
       lock: signerLock,
       type: udtScript,
     },
-    ccc.numLeToBytes(inputsAmount - sendAmount, 16),
+    ccc.numLeToBytes(inputsAmount - sendAmount * count, 16),
   );
   await tx.prepareSighashAllWitness(signerLock, 65, signer.client);
 
