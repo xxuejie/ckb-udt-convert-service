@@ -517,7 +517,7 @@ async function confirm(params: Params): Promise<Result> {
 
   return {
     result: {
-      transaction: buildTx(params.c, tx),
+      transaction: buildTx(params.c, signedTx),
     },
   };
 }
