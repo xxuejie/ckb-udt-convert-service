@@ -57,21 +57,7 @@ async function run() {
     outputs: [{ lock: recipient.script, type: udtScript }],
     outputsData: [ccc.numLeToBytes(sendAmount, 16)],
   });
-  // This is actually completeInputsByUdt, except that we don't always try
-  // to collect 2 inputs
-  await tx.completeInputs(
-    signer,
-    {
-      script: udtScript,
-      outputDataLenRange: [16, ccc.numFrom("0xffffffff")],
-    },
-    (acc, { outputData }, _i, _collected) => {
-      const balance = ccc.udtBalanceFrom(outputData);
-      const sum = acc + balance;
-      return sum >= sendAmount + spareAmount ? undefined : sum;
-    },
-    0n,
-  );
+  await tx.completeInputsByUdt(signer, udtScript, spareAmount);
   const inputsCapacity = await tx.getInputsCapacity(signer.client);
   const inputsAmount = await tx.getInputsUdtBalance(signer.client, udtScript);
 
@@ -91,7 +77,7 @@ async function run() {
     transaction: completedTx,
     askTokens,
     bidTokens,
-  } = await rpcClient.request("initiate", [tx, [1]]);
+  } = await rpcClient.request("initiate", [tx, [tx.outputs.length - 1]]);
   console.log("Request valid until:", validUntil);
   console.log("Ask USDI:", ccc.fixedPointToString(ccc.numFrom(askTokens), 6));
   console.log("Bid CKBytes:", ccc.fixedPointToString(ccc.numFrom(bidTokens)));
