@@ -83,6 +83,7 @@ export const initialUdtCellCkb = ccc.fixedPointFrom(
   env("INITIAL_UDT_CELL_CKB"),
 );
 export const minUdtCellCkb = ccc.fixedPointFrom(env("MIN_UDT_CELL_CKB"));
+export const maxTradedCkb = ccc.fixedPointFrom(env("MAX_TRADED_CKB"));
 
 export const ASSEMBLE_BATCH = 50;
 if (initialUdtCellCkb / minUdtCellCkb >= ASSEMBLE_BATCH) {

@@ -54,8 +54,6 @@ async function init() {
       }
       break;
   }
-  // TODO: right now the price is hardcoded to 1 CKB == 0.01 USDI,
-  // we should allow customizations.
 
   const refresherJob = await refresherQueue.upsertJobScheduler(
     "periodic-refresher",

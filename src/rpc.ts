@@ -9,6 +9,7 @@ import {
   funder,
   incentivePercent,
   lockedSeconds,
+  maxTradedCkb,
   commitingSeconds,
   signerQueue,
   udtCellDeps,
@@ -290,6 +291,14 @@ async function initiate(params: Params): Promise<Result> {
     incentivePercent,
     bidTokens,
   );
+  if (bidTokens > maxTradedCkb) {
+    return {
+      error: {
+        code: ERROR_CODE_INVALID_INPUT,
+        message: `You are trading too many CKBytes in one transaction!`,
+      },
+    };
+  }
 
   // Modify locked cells to charge +bidTokens+ CKBytes, collect +askTokens+ UDTs
   {
