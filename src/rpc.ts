@@ -60,26 +60,28 @@ interface Result {
 }
 
 function buildParams(params?: JSONRPCParams): Params {
-  let c = "camel" as Case;
+  let forceParamCase = null;
   if (!_.isArray(params)) {
     throw new Error("Params must be an array!");
   }
   if (params[params.length - 1] === "snake") {
-    c = "snake";
+    forceParamCase = "snake";
+    params.pop();
+  } else if (params[params.length - 1] === "camel") {
+    forceParamCase = "camel";
     params.pop();
   }
   const txData = params.shift();
   if (!_.isObject(txData)) {
     throw new Error("The first element in params must be the tx object!");
   }
-  if (_.has(txData, "outputs_data")) {
-    c = "snake";
-  }
+  const inputCase = _.has(txData, "outputs_data") ? "snake" : "camel";
   // TODO: validate input parameters
   const tx =
-    c === "camel"
-      ? ccc.Transaction.from(txData)
-      : cccA.JsonRpcTransformers.transactionTo(txData as any);
+    inputCase === "snake"
+      ? cccA.JsonRpcTransformers.transactionTo(txData as any)
+      : ccc.Transaction.from(txData);
+  const c = forceParamCase !== null ? (forceParamCase as Case) : inputCase;
   return {
     c,
     tx,
