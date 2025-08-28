@@ -1,11 +1,11 @@
 import { Worker } from "bullmq";
 import { ccc } from "@ckb-ccc/core";
 
-import { dbConnection, queueConnection, funder } from "./env";
+import { dbConnection, queueConnection, ckbClient } from "./instances";
 import { env, Logger } from "./utils";
 
 const signer = new ccc.SignerCkbPrivateKey(
-  funder.client,
+  ckbClient,
   env("FUND_POOL_PRIVATE_KEY"),
 );
 

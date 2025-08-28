@@ -10,7 +10,7 @@
   "license": "MIT",
   "description": "",
   "dependencies": {
-    "@ckb-ccc/core": "^1.9.0",
+    "@ckb-ccc/core": "^1.11.1",
     "@hastom/fixed-point": "^4.3.1",
     "@sesamecare-oss/redlock": "^1.4.0",
     "binance-api-node": "^0.12.9",

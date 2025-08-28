@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ckb-ccc/core':
-        specifier: ^1.9.0
-        version: 1.9.0(typescript@5.8.3)
+        specifier: ^1.11.1
+        version: 1.11.1(typescript@5.8.3)
       '@hastom/fixed-point':
         specifier: ^4.3.1
         version: 4.3.1
@@ -244,8 +244,8 @@ packages:
     resolution: {integrity: sha512-ruv7Ae4J5dUYULmeXw1gmb7rYRz57OWCPM57pHojnLq/3Z1CK2lNSLTCVjxVk1F/TZHwOZZrOWi0ur95BbLxNQ==}
     engines: {node: '>=6.9.0'}
 
-  '@ckb-ccc/core@1.9.0':
-    resolution: {integrity: sha512-znKLUJ9rTThtkyUKykZXfNM+Pj1GqCrlhYwl3LZ2EZSPQnQLTD6OquWoEaXLQppgGQ3+GYGjl6ZZDJhu796mHA==}
+  '@ckb-ccc/core@1.11.1':
+    resolution: {integrity: sha512-UD8oVmniAXxffHIljADeGes6gjnI89YBAO6m3wVdfFeKw6X8AG3z+bpIQYSOIWRJWBqIhhz9Ta2MP+sVg7FUzg==}
 
   '@hastom/fixed-point@4.3.1':
     resolution: {integrity: sha512-spzWEk2UmxzmrwROHJxeGkgIef6b4ChMDsLwtykWxuCvtA7JTF7O2LXn1YmmjcSy8MWr7ZoEnVafHwp9kwVM0w==}
@@ -1769,7 +1769,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
 
-  '@ckb-ccc/core@1.9.0(typescript@5.8.3)':
+  '@ckb-ccc/core@1.11.1(typescript@5.8.3)':
     dependencies:
       '@joyid/ckb': 1.1.2(typescript@5.8.3)
       '@noble/ciphers': 0.5.3

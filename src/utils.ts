@@ -3,8 +3,9 @@ import { ccc } from "@ckb-ccc/core";
 import { cccA } from "@ckb-ccc/core/advanced";
 import IORedis from "ioredis";
 
-import fs from "fs";
 import util from "util";
+
+export { NoCache, buildNoCacheClient } from "./ccc";
 
 const pinoLogger = pino();
 
@@ -41,55 +42,6 @@ export function env(value: string): string {
     process.env[value],
     `${value} is not set in .env file!`,
   );
-}
-
-// We will use this till we figure out the details of ccc's cache
-export class NoCache extends ccc.ClientCache {
-  async markUsableNoCache(
-    ...cellLikes: (ccc.CellLike | ccc.CellLike[])[]
-  ): Promise<void> {}
-
-  async markUnusable(
-    ...outPointLikes: (ccc.OutPointLike | ccc.OutPointLike[])[]
-  ): Promise<void> {}
-
-  async clear(): Promise<void> {}
-
-  async *findCells(
-    keyLike: cccA.ClientCollectableSearchKeyLike,
-  ): AsyncGenerator<ccc.Cell> {}
-
-  async isUnusable(outPointLike: ccc.OutPointLike): Promise<boolean> {
-    return false;
-  }
-}
-
-export function buildNoCacheClient(
-  network: string,
-  url: string,
-  scriptConfigFile: string,
-) {
-  switch (network) {
-    case "mainnet":
-      return new ccc.ClientPublicMainnet({
-        url,
-        cache: new NoCache(),
-      });
-    case "testnet":
-      return new ccc.ClientPublicTestnet({
-        url,
-        cache: new NoCache(),
-      });
-    case "devnet":
-      return new ccc.ClientPublicTestnet({
-        url,
-        scripts: JSON.parse(fs.readFileSync(scriptConfigFile, "utf8")),
-        fallbacks: [],
-        cache: new NoCache(),
-      });
-    default:
-      throw new Error(`Unknown network value: ${network}`);
-  }
 }
 
 export function epoch_timestamp(): string {
@@ -157,13 +109,13 @@ export function txExternalKey(tx: ccc.Transaction): ccc.Hex {
 
 export async function cancelAllCommitingCells(
   tx: ccc.Transaction,
-  funder: ccc.SignerCkbPublicKey,
+  funder: ccc.Signer,
   dbConnection: IORedis,
 ) {
   const keyCellBytes = txExternalKey(tx);
   const txKey = buildKey(KEY_PREFIX_TX, keyCellBytes);
   const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, keyCellBytes);
-  const funderScript = (await funder.getAddressObjSecp256k1()).script;
+  const funderScript = (await funder.getRecommendedAddressObj()).script;
 
   for (const input of tx.inputs) {
     const inputCell = await input.getCell(funder.client);

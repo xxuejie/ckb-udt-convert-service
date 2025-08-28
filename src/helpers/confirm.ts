@@ -2,31 +2,13 @@ import dotenv from "dotenv";
 dotenv.config({ path: process.env["DOTENV_FILE"] || ".env" });
 
 import { ccc } from "@ckb-ccc/core";
-import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
+import { buildJsonRpcClient } from "../jsonrpc";
 import { env, buildNoCacheClient } from "../utils";
 
-const rpcClient = new JSONRPCClient(
-  (jsonRPCRequest: any): Promise<any> =>
-    fetch(env("SERVER_URL"), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: ccc.stringify(jsonRPCRequest),
-    }).then((response) => {
-      if (response.status === 200) {
-        // Use client.receive when you received a JSON-RPC response.
-        return response
-          .json()
-          .then((jsonRPCResponse) => rpcClient.receive(jsonRPCResponse));
-      } else if (jsonRPCRequest.id !== undefined) {
-        return Promise.reject(new Error(response.statusText));
-      }
-    }),
-);
+const rpcClient = buildJsonRpcClient(env("SERVER_URL"));
 
 async function run() {
   const ckbClient = buildNoCacheClient(
