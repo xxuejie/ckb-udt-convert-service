@@ -14,7 +14,7 @@
       }
     ]
   },
-  "Secp256k1Multisig": {
+  "Secp256k1MultisigV2": {
     "codeHash": "0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8",
     "hashType": "type",
     "cellDeps": [

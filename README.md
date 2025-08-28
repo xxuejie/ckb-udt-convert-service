@@ -122,3 +122,116 @@ PORT=10001
 # HTTP POST path for the jsonrpc server, when omitted, the default value is "/rpc"
 RPC_PATH=/a36645c85487c9576a5ce3ddccc1c056c7e2f7e13cf6e18ef5e369b79c1fb48e/rpc
 ```
+
+### Multisig
+
+Optionally, `ckb-udt-convert-service` has multisig support on fund pool cells. Utilizing multisig support, one can separate the RPC server and a series of signer-only servers kept in separate environments, or across multiple parties.
+
+Let use an example to show case how to setup multisig support. Assuming we are now setting up 2-of-3 multisig using the following address:
+
+* `ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqddrysqvx4ys3z03vpnf6dmfutuhm2yy7g3v5j6j`
+* `ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqv63lyazq6khwq0xtakrmle0wxlzpw73rg4pthy6`
+* `ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqv8y7ryunhsd58v373mhssmyg3q48k8wdqx6rs92`
+
+Of the 3 signers, signatures for the first address must always present. Using [ckb's conventional multisig design](https://github.com/nervosnetwork/ckb-system-scripts/blob/72eb92fca090700dcb398cd8cad8fbd8bad40355/c/secp256k1_blake160_multisig_all.c#L19-L28), the following parameters are used:
+
+* `R` is 1
+* `M` is 2
+* `N` is 3
+
+First of all, a helper script is provided to generate multisig config script:
+
+```bash
+$ npm run build
+$ node dist/helpers/multisig_address_generator.js \
+    -r ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqddrysqvx4ys3z03vpnf6dmfutuhm2yy7g3v5j6j \
+    -a ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqv63lyazq6khwq0xtakrmle0wxlzpw73rg4pthy6 \
+       ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqv8y7ryunhsd58v373mhssmyg3q48k8wdqx6rs92 \
+    -m 2
+    -o multisig.json
+Multisig address:  ckt1qpw9q60tppt7l3j7r09qcp7lxnp3vcanvgha8pmvsa3jplykxn32sqgrz03j4dl05q334f38f63khnjp2crhlyqlz0h72
+Please revise multisig.json file with the correct endpoints!
+```
+
+`-r` is used to specify required addresses, while `-a` specifies normal addresses in multisig config. For more details please use `node dist/helpers/multisig_address_generator.js --help`.
+
+In this setup, `ckt1qpw9q60tppt7l3j7r09qcp7lxnp3vcanvgha8pmvsa3jplykxn32sqgrz03j4dl05q334f38f63khnjp2crhlyqlz0h72` will be the main fund pool address, a local file `multisig.json` keeps multisig configuration required by `ckb-udt-convert-service`, the following is an example of this file:
+
+```bash
+$ cat multisig.json
+{
+  "r": 1,
+  "m": 2,
+  "pubkeys": [
+    "0xad1920061aa48444f8b0334e9bb4f17cbed44279",
+    "0x9a8fc9d10356bb80f32fb61eff97b8df105de88d",
+    "0x8727864e4ef06d0ec8fa3bbc21b22220a9ec7734"
+  ],
+  "endpoints": [
+    "TODO: replace this with actual endpoint!",
+    "TODO: replace this with actual endpoint!",
+    "TODO: replace this with actual endpoint!"
+  ]
+}
+```
+
+While the multisig config are already filled in this file, the endpoints for individual multisig signer server are left to be filled. We will come back to this later.
+
+For each signer, we need to setup their own `env` file separate from the main rpc server(for security reasons). Below is an example `env` file for `ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqddrysqvx4ys3z03vpnf6dmfutuhm2yy7g3v5j6j`:
+
+```bash
+$ cat signer1.env
+CKB_RPC_URL="http://127.0.0.1:8114"
+CKB_NETWORK="devnet"
+SCRIPT_CONFIG_FILE="devnet-offckb.json"
+MULTISIG_CONFIG_FILE="multisig.json"
+MULTISIG_PRIVATE_KEY="0x<I am a private key>"
+PORT=11001
+```
+
+Signer server requires much less configuration parameters than the main jsonrpc server. For this signer server, we have it listen at PORT `11001`.
+
+We can use the following command to boo the signer server:
+
+```bash
+$ DOTENV_FILE=signer1.env node dist/entries/multisig_signer.js | pino-pretty
+```
+
+Similarly, we can setup the other 2 signer servers at PORT `11002` and `11003`.
+
+Now we can update `multisig.json` file with correct endpoints:
+
+```bash
+$ cat multisig.json
+{
+  "r": 1,
+  "m": 2,
+  "pubkeys": [
+    "0xad1920061aa48444f8b0334e9bb4f17cbed44279",
+    "0x9a8fc9d10356bb80f32fb61eff97b8df105de88d",
+    "0x8727864e4ef06d0ec8fa3bbc21b22220a9ec7734"
+  ],
+  "endpoints": [
+    "http://127.0.0.1:11001/rpc",
+    "http://127.0.0.1:11002/rpc",
+    "http://127.0.0.1:11003/rpc"
+  ]
+}
+```
+
+The `.env` file for the main jsonrpc server should be adjusted as well with the following 2 lines:
+
+```bash
+FUND_POOL_MODE=multisig
+MULTISIG_CONFIG_FILE=multisig.json
+```
+
+These 2 lines ensures that the main jsonrpc server is booted in multisig mode, reading `multisig.json` file for multisig configuration and signer server endpoints.
+
+Now we can star the main jsonrpc server(but with a different entry file compared to singlesig case):
+
+```bash
+$ node dist/entries/multisig.js | pino-pretty
+```
+
+The server is now booted in multisig mode.

@@ -2,38 +2,16 @@ import dotenv from "dotenv";
 dotenv.config({ path: process.env["DOTENV_FILE"] || ".env" });
 
 import { ccc } from "@ckb-ccc/core";
-import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
-import { env, buildNoCacheClient } from "../utils";
+import { buildJsonRpcClient } from "../jsonrpc";
+import { env, buildCccClient } from "../utils";
 
-const rpcClient = new JSONRPCClient(
-  (jsonRPCRequest: any): Promise<any> =>
-    fetch(env("SERVER_URL"), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: ccc.stringify(jsonRPCRequest),
-    }).then((response) => {
-      if (response.status === 200) {
-        // Use client.receive when you received a JSON-RPC response.
-        return response
-          .json()
-          .then((jsonRPCResponse) => rpcClient.receive(jsonRPCResponse));
-      } else if (jsonRPCRequest.id !== undefined) {
-        return Promise.reject(new Error(response.statusText));
-      }
-    }),
-);
+const rpcClient = buildJsonRpcClient(env("SERVER_URL"));
 
 async function run() {
-  const ckbClient = buildNoCacheClient(
-    env("CKB_NETWORK"),
-    env("CKB_RPC_URL"),
-    env("SCRIPT_CONFIG_FILE"),
-  );
+  const ckbClient = buildCccClient();
 
   const signer = new ccc.SignerCkbPrivateKey(
     ckbClient,
@@ -43,7 +21,7 @@ async function run() {
   const tx = ccc.Transaction.from(
     JSON.parse(fs.readFileSync(env("HELPER_INPUT_CONFIRMING_TX"), "utf8")),
   );
-  const signedTx = await signer.signTransaction(tx);
+  const signedTx = await signer.signOnlyTransaction(tx);
 
   const response = await rpcClient.request("confirm", [signedTx]);
   const completeTx = ccc.Transaction.from(response.transaction);

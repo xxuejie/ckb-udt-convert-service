@@ -6,14 +6,10 @@ import { JSONRPCClient } from "json-rpc-2.0";
 
 import fs from "fs";
 
-import { env, buildNoCacheClient } from "../utils";
+import { env, buildCccClient } from "../utils";
 
 async function run() {
-  const ckbClient = buildNoCacheClient(
-    env("CKB_NETWORK"),
-    env("CKB_RPC_URL"),
-    env("SCRIPT_CONFIG_FILE"),
-  );
+  const ckbClient = buildCccClient();
 
   const udts = JSON.parse(fs.readFileSync(env("UDT_SCRIPTS_FILE"), "utf8"));
   const udtName = env("ASK_UDT");

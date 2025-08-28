@@ -1,22 +1,33 @@
-import { JSONRPC, JSONRPCID, JSONRPCServer, JSONRPCParams } from "json-rpc-2.0";
+import { Queue } from "bullmq";
+import { JSONRPCServer } from "json-rpc-2.0";
 import { backOff } from "exponential-backoff";
+import IORedis from "ioredis";
 import { ccc } from "@ckb-ccc/core";
-import { cccA } from "@ckb-ccc/core/advanced";
 import _ from "lodash";
 
+import { SignerCkbMultisig } from "../ccc";
+import { signMultisigTx } from "../multisig/utils";
+
 import {
-  dbConnection,
-  funder,
+  buildParams,
+  buildTx,
+  buildResponse,
+  Params,
+  Result,
+  ERROR_CODE_INVALID_INPUT,
+  ERROR_CODE_SERVER,
+} from "./utils";
+
+import {
   incentivePercent,
   lockedSeconds,
   maxTradedCkb,
   commitingSeconds,
-  signerQueue,
   udtCellDeps,
   udtName,
   udtInfo,
   udtScript,
-} from "./env";
+} from "../configs";
 import {
   buildKey,
   calculateBidUdts,
@@ -32,113 +43,44 @@ import {
   KEY_PENDING_TXS,
   KEY_PREFIX_TX,
   KEY_PREFIX_SIGNED_TX,
-} from "./utils";
+} from "../utils";
 
-export const rpc = new JSONRPCServer();
+export type RpcMode = "singlesig" | "multisig";
 
-rpc.addMethodAdvanced("initiate", async (request) => {
-  const params = buildParams(request.params);
-  return buildResponse(params.c, await initiate(params), request.id || null);
-});
-
-rpc.addMethodAdvanced("confirm", async (request) => {
-  const params = buildParams(request.params);
-  return buildResponse(params.c, await confirm(params), request.id || null);
-});
-
-type Case = "camel" | "snake";
-
-interface Params {
-  c: Case;
-  tx: ccc.Transaction;
-  others: any[];
+export interface RpcConfig {
+  dbConnection: IORedis;
+  signerQueue: Queue;
+  funder: ccc.Signer;
+  mode: RpcMode;
 }
 
-interface Result {
-  result?: any;
-  error?: { code: number; message: string; data?: any };
-}
+export function buildRpc(config: RpcConfig) {
+  const rpc = new JSONRPCServer();
 
-function buildParams(params?: JSONRPCParams): Params {
-  let forceParamCase = null;
-  if (!_.isArray(params)) {
-    throw new Error("Params must be an array!");
-  }
-  if (params[params.length - 1] === "snake") {
-    forceParamCase = "snake";
-    params.pop();
-  } else if (params[params.length - 1] === "camel") {
-    forceParamCase = "camel";
-    params.pop();
-  }
-  const txData = params.shift();
-  if (!_.isObject(txData)) {
-    throw new Error("The first element in params must be the tx object!");
-  }
-  const inputCase = _.has(txData, "outputs_data") ? "snake" : "camel";
-  // TODO: validate input parameters
-  const tx =
-    inputCase === "snake"
-      ? cccA.JsonRpcTransformers.transactionTo(txData as any)
-      : ccc.Transaction.from(txData);
-  const c = forceParamCase !== null ? (forceParamCase as Case) : inputCase;
-  return {
-    c,
-    tx,
-    others: params,
-  };
-}
-
-function buildTx(c: Case, tx: ccc.Transaction) {
-  if (c === "camel") {
-    return tx;
-  } else {
-    return cccA.JsonRpcTransformers.transactionFrom(tx);
-  }
-}
-
-function buildResponse(c: Case, result: Result, id: JSONRPCID | null) {
-  const base = {
-    jsonrpc: JSONRPC,
-    id: id || null,
-  };
-  if (result.error !== undefined) {
-    return Object.assign({}, base, {
-      error: result.error,
-    });
-  } else {
-    return Object.assign({}, base, {
-      result: transformResultCase(c, result.result),
-    });
-  }
-}
-
-function transformResultCase(c: Case, result?: any): any {
-  if (c === "camel") {
-    return snakeToCamel(result);
-  } else {
-    return camelToSnake(result);
-  }
-}
-
-function camelToSnake(obj: any) {
-  return _.transform(obj, (result: any, value, key: string) => {
-    const snakeKey = _.snakeCase(key);
-    result[snakeKey] = _.isObject(value) ? camelToSnake(value) : value;
+  rpc.addMethodAdvanced("initiate", async (request) => {
+    const params = buildParams(request.params);
+    return buildResponse(
+      params.c,
+      await initiate(config, params),
+      request.id || null,
+    );
   });
-}
 
-function snakeToCamel(obj: any) {
-  return _.transform(obj, (result: any, value, key: string) => {
-    const snakeKey = _.camelCase(key);
-    result[snakeKey] = _.isObject(value) ? snakeToCamel(value) : value;
+  rpc.addMethodAdvanced("confirm", async (request) => {
+    const params = buildParams(request.params);
+    return buildResponse(
+      params.c,
+      await confirm(config, params),
+      request.id || null,
+    );
   });
+
+  return rpc;
 }
 
-const ERROR_CODE_INVALID_INPUT = 2001;
-const ERROR_CODE_SERVER = 2002;
+async function initiate(config: RpcConfig, params: Params): Promise<Result> {
+  const { dbConnection, funder } = config;
 
-async function initiate(params: Params): Promise<Result> {
   let tx = params.tx;
 
   const currentTimestamp = epoch_timestamp();
@@ -147,7 +89,7 @@ async function initiate(params: Params): Promise<Result> {
   ).toString();
 
   {
-    const funderScript = (await funder.getAddressObjSecp256k1()).script;
+    const funderScript = (await funder.getRecommendedAddressObj()).script;
     const collectingScript = (
       await ccc.Address.fromString(
         env("COLLECTING_POOL_ADDRESS"),
@@ -429,7 +371,9 @@ async function initiate(params: Params): Promise<Result> {
   };
 }
 
-async function confirm(params: Params): Promise<Result> {
+async function confirm(config: RpcConfig, params: Params): Promise<Result> {
+  const { dbConnection, funder, signerQueue } = config;
+
   let tx = params.tx;
   if (tx.inputs.length === 0) {
     return {
@@ -460,7 +404,7 @@ async function confirm(params: Params): Promise<Result> {
   }
   try {
     const savedTx = ccc.Transaction.fromBytes(savedTxBytes);
-    if (!(await compareTx(tx, savedTx))) {
+    if (!(await compareTx(funder, tx, savedTx))) {
       Logger.error(`User provided a modified tx for ${savedTx.hash()}`);
       return INVALID_CELL_ERROR;
     }
@@ -471,7 +415,7 @@ async function confirm(params: Params): Promise<Result> {
 
   {
     // Commit all funder cells
-    const funderScript = (await funder.getAddressObjSecp256k1()).script;
+    const funderScript = (await funder.getRecommendedAddressObj()).script;
 
     for (const input of tx.inputs) {
       const inputCell = await input.getCell(funder.client);
@@ -492,23 +436,7 @@ async function confirm(params: Params): Promise<Result> {
     }
   }
 
-  const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, keyBytes);
-  await signerQueue.add("sign", {
-    tx: ccc.hexFrom(tx.toBytes()),
-    targetKey: signedTxKey,
-    ex: commitingSeconds * 2,
-  });
-
-  await backOff(async () => {
-    if ((await dbConnection.exists(signedTxKey)) < 1) {
-      throw new Error("wait!");
-    }
-  });
-
-  const signedTx = ccc.Transaction.fromBytes(
-    (await dbConnection.get(signedTxKey))!,
-  );
-
+  const signedTx = await signTx(tx, config);
   try {
     const txHash = await funder.client.sendTransaction(signedTx);
     Logger.info(`Tx ${txHash} submitted to CKB!`);
@@ -535,6 +463,7 @@ async function confirm(params: Params): Promise<Result> {
 
 // Only witnesses belonging to users can be tweaked(mainly for signatures)
 async function compareTx(
+  funder: ccc.Signer,
   tx: ccc.Transaction,
   savedTx: ccc.Transaction,
 ): Promise<boolean> {
@@ -545,7 +474,7 @@ async function compareTx(
     return false;
   }
 
-  const funderScript = (await funder.getAddressObjSecp256k1()).script;
+  const funderScript = (await funder.getRecommendedAddressObj()).script;
   for (let i = 0; i < tx.witnesses.length; i++) {
     const inputCell = await tx.inputs[i].getCell(funder.client);
     if (inputCell.cellOutput.lock.eq(funderScript)) {
@@ -555,4 +484,39 @@ async function compareTx(
     }
   }
   return true;
+}
+
+async function signTx(
+  tx: ccc.Transaction,
+  config: RpcConfig,
+): Promise<ccc.Transaction> {
+  switch (config.mode) {
+    case "singlesig":
+      {
+        const keyBytes = txExternalKey(tx);
+        const signedTxKey = buildKey(KEY_PREFIX_SIGNED_TX, keyBytes);
+        await config.signerQueue.add("sign", {
+          tx: ccc.hexFrom(tx.toBytes()),
+          targetKey: signedTxKey,
+          ex: commitingSeconds * 2,
+        });
+
+        await backOff(async () => {
+          if ((await config.dbConnection.exists(signedTxKey)) < 1) {
+            throw new Error("wait!");
+          }
+        });
+
+        return ccc.Transaction.fromBytes(
+          (await config.dbConnection.get(signedTxKey))!,
+        );
+      }
+      break;
+    case "multisig":
+      {
+        const funder = config.funder as SignerCkbMultisig;
+        return await signMultisigTx(tx, funder);
+      }
+      break;
+  }
 }
