@@ -127,6 +127,8 @@ RPC_PATH=/a36645c85487c9576a5ce3ddccc1c056c7e2f7e13cf6e18ef5e369b79c1fb48e/rpc
 
 Optionally, `ckb-udt-convert-service` has multisig support on fund pool cells. Utilizing multisig support, one can separate the RPC server and a series of signer-only servers kept in separate environments, or across multiple parties.
 
+**NOTE**: as a brand new project, `ckb-udt-convert-service` uses the newly deployed [multisig script](https://github.com/nervosnetwork/ckb-system-scripts/pull/99), which is different from the one included in CKB's genesis script. Please do make sure you are paying attention to this details. If you are using [ccc](https://github.com/ckb-devrel/ccc), please ensure you are using `ccc.KnownScript.Secp256k1MultisigV2`.
+
 Let use an example to show case how to setup multisig support. Assuming we are now setting up 2-of-3 multisig using the following address:
 
 * `ckt1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqddrysqvx4ys3z03vpnf6dmfutuhm2yy7g3v5j6j`
